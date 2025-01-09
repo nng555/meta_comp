@@ -5,6 +5,9 @@ recon/
 __pycache__/
 *.py[cod]
 *$py.class
+meta_datasets/
+meta_model_checkpoints/
+playground.*
 
 # C extensions
 *.so
@@ -163,3 +166,7 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# VS Code
+.DS_Store
+meta_comp.code-workspace

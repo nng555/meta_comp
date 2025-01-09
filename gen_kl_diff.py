@@ -22,10 +22,10 @@ def get_embeddings(model, extractor, imgs, device):
 
 @app.command()
 def gen_kl_diff(
-    m1_path: str=None,
-    m2_base_path: str=None,
-    bsize: int=100,
-    n_kl_samples: int=10000,
+    m1_path: str="e0.pt",
+    m2_base_path: str="e3.pt",
+    bsize: int=10,
+    n_kl_samples: int=100,
     n_ll_samples: int=100,
     embed: bool=True,
     embed_model_name: str="google/vit-base-patch16-224",
@@ -34,24 +34,28 @@ def gen_kl_diff(
         if embed:
             extractor = ViTImageProcessor.from_pretrained(embed_model_name, do_rescale=False)
             embed_model = AutoModel.from_pretrained(embed_model_name, output_hidden_states=True)
-            embed_model.cuda()
+            #embed_model
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        m1 = torch.load(m1_path, weights_only=False)
+        m1 = torch.load(m1_path, weights_only=False, map_location=torch.device(device))
         m1.to(device).eval()
 
         m1_name = os.path.basename(m1_path)[:-3]
 
-        m1_parent_dir = str(Path(m1_path).parent.stem)
-        m2_parent_dir = os.path.basename(m2_base_path)
+        # m1_parent_dir = str(Path(m1_path).parent.stem)
+        # m2_parent_dir = os.path.basename(m2_base_path)
 
-        save_dir = '/scratch/nhn234/data/kl_diffs/' + m1_parent_dir + '_vs_' + m2_parent_dir
+        save_dir = 'kl_diffs' # + m1_parent_dir + '_vs_' + m2_parent_dir
         Path(save_dir).mkdir(parents=True, exist_ok=True)
 
-        for m2_path in os.listdir(m2_base_path):
+        for m2_path in [m2_base_path]: #os.listdir(m2_base_path):
 
+            # m2 = torch.load(
+            #     os.path.join(m2_base_path, m2_path),
+            #     weights_only=False
+            # )
             m2 = torch.load(
-                os.path.join(m2_base_path, m2_path),
+                os.path.join(m2_base_path),
                 weights_only=False
             )
 
