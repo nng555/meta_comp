@@ -29,20 +29,21 @@ class MetaMLP(nn.Module):
         return x
 
 class MetaDataset(Dataset):
-    def __init__(self, data_dir):
+    def __init__(self, data_dirs):
         self.data = []
         self.labels = []
         self.names = []
 
-        for f in os.listdir(data_dir):
-            if 'diff.pt' not in f:
-                continue
+        for data_dir in data_dirs:
+            for f in os.listdir(data_dir):
+                if 'diff.pt' not in f:
+                    continue
 
-            self.labels.append(torch.load(os.path.join(data_dir, f), weights_only=True).cuda())
-            self.data.append(torch.load(os.path.join(data_dir, f[:-7] + 'img.pt'), weights_only=True).cuda())
-            self.names.append(f[:-8])
+                self.labels.append(torch.load(os.path.join(data_dir, f), weights_only=True).cuda())
+                self.data.append(torch.load(os.path.join(data_dir, f[:-7] + 'img.pt'), weights_only=True).cuda())
+                self.names.append(f[:-8])
 
-        self.n_per_set = len(self.data[0])
+            self.n_per_set = len(self.data[0])
 
     def __getitem__(self, idx):
         ridx = idx % self.n_per_set
@@ -53,6 +54,16 @@ class MetaDataset(Dataset):
     def __len__(self):
         return sum([len(d) for d in self.data])
 
+class MetaSubDataset(Dataset):
+    def __init__(self, data, labels, name):
+        self.name = name
+        self.data = data
+        self.labels = labels
 
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
+    def __len__(self):
+        return len(self.data)
 
 

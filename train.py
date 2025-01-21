@@ -35,7 +35,7 @@ def train(
 
     # load dataset
     data = load_dataset('nielsr/CelebA-faces', split='train')
-    data = data.train_test_split(test_size=0.00025)
+    data = data.train_test_split(test_size=0.01)
 
     # set transforms
     def celeb_t(examples):
