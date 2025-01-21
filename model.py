@@ -201,7 +201,6 @@ class VAE(nn.Module):
         z = torch.randn(num_samples,
                         self.latent_dim)
 
-
         z = z.to(current_device)
 
         log_z = Normal(
@@ -209,7 +208,10 @@ class VAE(nn.Module):
             torch.ones_like(z)
         ).log_prob(z).sum(-1)
 
-        sample_means = self.decode(z)
+        sample_means = torch.clamp(
+            self.decode(z),
+            min=0., max=1.,
+        )
 
         """
         noise = torch.normal(

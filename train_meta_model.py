@@ -1,12 +1,21 @@
-from meta_model import MetaMLP, MetaDataset
+from meta_model import *
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+from collections import defaultdict
+import itertools
 import torch.nn.functional as F
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ConstantLR, LinearLR, SequentialLR
 
+import typer
+app = typer.Typer()
+
+@app.command()
 def train(
-    data_path,
+    data_path: str='kl_diffs/vae_final_vs_vae_final',
     bsize: int=64,
     nepochs: int=10,
     lr: float=1e-3,
@@ -15,8 +24,8 @@ def train(
     model = MetaMLP()
     model.cuda()
 
-    trainset = MetaDataset(data_path + '/train')
-    testset = MetaDataset(data_path + '/test')
+    trainset = MetaDataset([data_path + '/train'])
+    testset = MetaDataset([data_path + '/test'])
 
     trainloader = DataLoader(trainset, batch_size=bsize, shuffle=True)
     testloader = DataLoader(testset, batch_size=bsize, shuffle=False)
@@ -72,8 +81,7 @@ def train(
 
         print(f"Test Loss: {test_loss:.4f}\tAccuracy: {test_acc:.4f}")
 
-
-
+    torch.save(model, '/scratch/nhn234/checkpoints/meta_model.pt')
 
 if __name__ == "__main__":
-    train('kl_diffs/vae_final_vs_vae_final')
+    app()
