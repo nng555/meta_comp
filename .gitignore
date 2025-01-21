@@ -5,6 +5,7 @@ recon/
 __pycache__/
 *.py[cod]
 *$py.class
+playground.*
 
 # C extensions
 *.so
