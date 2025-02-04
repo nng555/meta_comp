@@ -6,15 +6,18 @@ ldim: ~
 command: ~
 m1: ~
 m2: ~
+test: ~
 
 hydra:
   launcher:
     cpus_per_task: 2
     mem: 15G
     gres: gpu:1
-    env_type: singularity
+    container: singularity
     singularity_img: /scratch/work/public/singularity/cuda11.6.124-cudnn8.4.0.27-devel-ubuntu20.04.4.sif
     singularity_overlay: /scratch/nhn234/singularity/lookahead.ext3
+    env_type: conda
+    env_name: unsloth_env
 ##### SUGGESTED HYDRA CONFIG ###########################
   sweep: 
     # subdir is built dynamically using the tags
