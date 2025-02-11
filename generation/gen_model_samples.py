@@ -9,10 +9,14 @@ import sys
 sys.path.append('/Users/mr7401/Desktop/Github Repos/meta_comp')
 from logger import Logger, add_log_args
 from models.llms import get_model
+import warnings
 
 # Initialize logger
 logger = Logger()
-def generate_sequences(model_name, num_sequences, max_length, output_file, use_local_weights, logger):
+def generate_sequences(model_name, num_sequences, max_length, output_file, use_local_weights, logger, test=False):
+    if test: 
+        warnings.warn("\n\n\n\n ******** WARNING: gen_model_samples is running in testing mode! This means the model is loaded, but not used for actual generations. ********")
+
     print(f"Writing to {output_file}")
 
     # ## Load a model and set the seed 
@@ -31,7 +35,11 @@ def generate_sequences(model_name, num_sequences, max_length, output_file, use_l
                 logger.log({"Progress": i})
         
             # generate
-            sequence = model.generate(prompt="", max_length=max_length)
+            if test:
+                sequence = "testing sequence"
+            else: 
+                sequence = model.generate(prompt="", max_length=max_length)
+            
             data_entry = {
                 "id": str(uuid.uuid4()),
                 "sequence": sequence,
@@ -60,19 +68,38 @@ if __name__ == "__main__":
     parser.add_argument('--max_length', type=int, required=False, default = 512, help='Maximum length of each generated sequence')
     parser.add_argument('--data_dir', type=str, required=True, help='Directory to make the dataset folder in')
     parser.add_argument('--use_local_weights', type=str2bool, required=False, default=False, help='If True, uses local version of stored weights rather than the HF API')
+    parser.add_argument('--test', type=str2bool, required=False, default=False, help='If True, run this script in testing mode (manual override of variables)')
     parser=add_log_args(parser)
 
     args, unknown_args = parser.parse_known_args()
+    print("Args given to gen_model_samples.py:")
     print(args)
+
+    if args.test:
+        warnings.warn("WARNING: in testing mode, which generates 10 sequences with max size 50.")
+        # Make logger 
+        logger = Logger(**vars(args))
+
+        os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
+
+        output_file = f"{args.data_dir}/{args.model_name}/{args.num_sequences}_{args.max_length}_generations_test.jsonl"
+        
+        # Generates 10 sequences with max size 50 to test file
+        generate_sequences(args.model_name, 10, 50, output_file, args.use_local_weights, logger, test=True)
+
+        print(f"Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}")
+        logger.finish()
     
-    # Make logger 
-    logger = Logger(**vars(args))
+    else: 
+         # Make logger 
+        logger = Logger(**vars(args))
 
-    os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
+        os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
 
-    output_file = f"{args.data_dir}/{args.model_name}/{args.num_sequences}_{args.max_length}_generations.jsonl"
+        output_file = f"{args.data_dir}/{args.model_name}/{args.num_sequences}_{args.max_length}_generations.jsonl"
+        
+        generate_sequences(args.model_name, args.num_sequences, args.max_length, output_file, args.use_local_weights, logger)
+
+        print(f"Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}")
+        logger.finish()
     
-    generate_sequences(args.model_name, args.num_sequences, args.max_length, output_file, args.use_local_weights, logger)
-
-    print(f"Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}")
-    logger.finish()

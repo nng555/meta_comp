@@ -7,7 +7,7 @@ import torch
 
 class Model:
     
-    def __init__(self, huggingface_id = "gpt2", local_path = None, use_local_weights=True):
+    def __init__(self, huggingface_id = "gpt2", local_path = None, use_local_weights=False):
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         print(f"Initializing Model, loading on {self.device}")
 
@@ -21,7 +21,7 @@ class Model:
             self.tokenizer = AutoTokenizer.from_pretrained(self.local_path, padding_side="left")
         else: 
             if self.use_local_weights:
-                warnings.warn("WARNING: Parameter 'use_local_weights' is set to True but no local path was provided. Loading model from huggingface instead.")
+                warnings.warn("\n\n\n\n\n ******** WARNING: Parameter 'use_local_weights' is set to True but no local path was provided. Loading model from huggingface instead. *****")
             print(f"Loading model from huggingface with huggingface id {self.huggingface_id}")
             self.model = AutoModelForCausalLM.from_pretrained(huggingface_id).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(huggingface_id, padding_side="left")
