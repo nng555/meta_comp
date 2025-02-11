@@ -93,6 +93,22 @@ class Llama31_405B(Model):
     def __init__(self, local_path=None, use_local_weights=False):
         super().__init__(huggingface_id="meta-llama/Llama-3.1-405B", local_path=local_path, use_local_weights=use_local_weights)
 
+class Llama3_8B(Model):
+    def __init__(self, local_path=None, use_local_weights=False):
+        super().__init__(huggingface_id="meta-llama/Llama-3-8B", local_path=local_path, use_local_weights=use_local_weights)
+
+class Llama3_70B(Model):
+    def __init__(self, local_path=None, use_local_weights=False):
+        super().__init__(huggingface_id="meta-llama/Llama-3-70B", local_path=local_path, use_local_weights=use_local_weights)
+
+class Llama2_7B(Model):
+    def __init__(self, local_path=None, use_local_weights=False):
+        super().__init__(huggingface_id="meta-llama/Llama-2-7B", local_path=local_path, use_local_weights=use_local_weights)
+
+class Llama2_13B(Model):
+    def __init__(self, local_path=None, use_local_weights=False):
+        super().__init__(huggingface_id="meta-llama/Llama-2-13B", local_path=local_path, use_local_weights=use_local_weights)
+
 ### OPT Models 
 class OPT125M(Model):
     def __init__(self, local_path=None, use_local_weights=False):
@@ -194,6 +210,10 @@ AVAILABLE_MODELS = {
     "Llama31_8B": Llama31_8B,
     "Llama31_70B": Llama31_70B,
     "Llama31_405B": Llama31_405B,
+    "Llama3_8B": Llama3_8B,
+    "Llama3_70B": Llama3_70B,
+    "Llama2_7B": Llama2_7B,
+    "Llama2_13B": Llama2_13B,
     "OPT125M": OPT125M,
     "OPT350M": OPT350M,
     "OPT1_3B": OPT1_3B,
