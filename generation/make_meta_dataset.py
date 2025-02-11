@@ -11,12 +11,16 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 import warnings
 
-def compute_kl_difference(example1, example2, model1, model2):
-    m1_m1_ll = model1.to_tokens_and_logprobs(example1)
-    m1_m2_ll = model1.to_tokens_and_logprobs(example2)
-    m2_m1_ll = model2.to_tokens_and_logprobs(example1)
-    m2_m2_ll = model2.to_tokens_and_logprobs(example2)
-    kl_diff = -(m1_m1_ll + m1_m2_ll) + (m2_m1_ll + m2_m2_ll)
+
+def mean(lst): 
+    return sum(lst) / len(lst)
+
+def compute_kl_difference(batch1, batch2, model1, model2):
+    m1_m1_ll = model1.to_tokens_and_logprobs(batch1)
+    m1_m2_ll = model1.to_tokens_and_logprobs(batch2)
+    m2_m1_ll = model2.to_tokens_and_logprobs(batch1)
+    m2_m2_ll = model2.to_tokens_and_logprobs(batch2)
+    kl_diff = -(mean(m1_m1_ll) + mean(m1_m2_ll) + mean(m2_m1_ll) + mean(m2_m2_ll))
     return kl_diff
 
 
@@ -36,8 +40,8 @@ def generate_meta_dataset(model_name, model_name2, dataset1, dataset2, output_fi
         d2 = d2.remove_columns(cols_to_remove)
 
     # Make datalaoders
-    dl1 = DataLoader(d1, batch_size=64, shuffle=False)
-    dl2 = DataLoader(d2, batch_size=64, shuffle=False)
+    dl1 = DataLoader(d1, batch_size=4, shuffle=False)
+    dl2 = DataLoader(d2, batch_size=4, shuffle=False)
 
     with jsonlines.open(output_file, mode='w') as writer:
         # Load all pairs of generations from models, and compute KL difference 
@@ -48,19 +52,18 @@ def generate_meta_dataset(model_name, model_name2, dataset1, dataset2, output_fi
                 i=i+1
                 if i % 10 == 0 and i != 0:
                     logger.log({"Progress": i})
-                for example1 in batch1:
-                    for example2 in batch2:
-                        metric = compute_kl_difference(example1, example2, model1, model2)
-                        # Make a dataset item and add to list
-                        data_entry = {
-                            "id": str(uuid.uuid4()),
-                            "model1": model1.huggingface_id,
-                            "model2": model2.huggingface_id,
-                            "gen1": example1, 
-                            "gen2": example2,
-                            "metric": metric
-                        }
-                        data_entries.append(data_entry)
+        
+                metric = compute_kl_difference(batch1, batch2, model1, model2)
+                # Make a dataset item and add to list
+                data_entry = {
+                    "id": str(uuid.uuid4()),
+                    "model1": model1.huggingface_id,
+                    "model2": model2.huggingface_id,
+                    "gen1": batch1, 
+                    "gen2": batch2,
+                    "metric": metric
+                }
+                data_entries.append(data_entry)
             
             # After each iteration of dataset 1, write to file and reset iterator 
             writer.write_all(data_entries)

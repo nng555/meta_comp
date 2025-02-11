@@ -5,27 +5,19 @@ from datetime import datetime
 import json
 import jsonlines
 import os 
-import sys
-sys.path.append('/Users/mr7401/Desktop/Github Repos/meta_comp')
 from logger import Logger, add_log_args
 from models.llms import get_model
 import warnings
 
-# Initialize logger
-logger = Logger()
 def generate_sequences(model_name, num_sequences, max_length, output_file, use_local_weights, logger, test=False):
     if test: 
-        warnings.warn("\n\n\n\n ******** WARNING: gen_model_samples is running in testing mode! This means the model is loaded, but not used for actual generations. ********")
+        warnings.warn("\n\n\n\n******** WARNING: gen_model_samples.py is running in testing mode! This means the model is loaded, but not used for the actual generations. ********\n\n\n\n ")
 
-    print(f"Writing to {output_file}")
-
-    # ## Load a model and set the seed 
+    # Load a model 
     model = get_model(model_name=model_name, use_local_weights=use_local_weights)
     date = datetime.now().date().isoformat()
 
-    print(f"Running model on {model.device}")
- 
-    # Make a dataset file to dump to 
+    # Make a dataset file to dump 
     with jsonlines.open(output_file, mode='w') as writer:
 
         # Generate sequences and write iteratively to file 
@@ -49,7 +41,7 @@ def generate_sequences(model_name, num_sequences, max_length, output_file, use_l
             # save to file
             writer.write(data_entry)
     
-    print("Completed Generations")
+    print("Completed Saving Generations")
     return 
 
 def str2bool(v):
@@ -65,41 +57,29 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate text sequences")
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use for generation')
     parser.add_argument('--num_sequences', type=int, required=True, help='Number of sequences to generate')
-    parser.add_argument('--max_length', type=int, required=False, default = 512, help='Maximum length of each generated sequence')
-    parser.add_argument('--data_dir', type=str, required=True, help='Directory to make the dataset folder in')
-    parser.add_argument('--use_local_weights', type=str2bool, required=False, default=False, help='If True, uses local version of stored weights rather than the HF API')
-    parser.add_argument('--test', type=str2bool, required=False, default=False, help='If True, run this script in testing mode (manual override of variables)')
+    parser.add_argument('--max_length', type=int, required=False, default = 512, help='Maximum token length of each generated sequence')
+    parser.add_argument('--data_dir', type=str, required=True, help='Directory to make the dataset folder in. Result will be data_dir/{new_folder_with_meta_info}/{actual_data_file.jsonl}')
+    parser.add_argument('--use_local_weights', type=str2bool, required=False, default=False, help='If True and local_path is passed (or default exists), we use the local version of stored weights rather than the HF API')
+    parser.add_argument('--local_path', type=str, required=False, help='If use_local_weights is set to True, the model uses the checkpoint at this path rather than the HF API')
+    parser.add_argument('--test', type=str2bool, required=False, default=False, help='If True, run this script in testing mode (testing loading the models and saving, without generation)')
     parser=add_log_args(parser)
 
     args, unknown_args = parser.parse_known_args()
-    print("Args given to gen_model_samples.py:")
-    print(args)
 
+    # Make logger and saving folders
+    logger = Logger(**vars(args))
+    os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
+   
     if args.test:
-        warnings.warn("WARNING: in testing mode, which generates 10 sequences with max size 50.")
-        # Make logger 
-        logger = Logger(**vars(args))
-
-        os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
-
-        output_file = f"{args.data_dir}/{args.model_name}/{args.num_sequences}_{args.max_length}_generations_test.jsonl"
-        
         # Generates 10 sequences with max size 50 to test file
+        output_file=f"{args.data_dir}/{args.model_name}/{args.num_sequences}_{args.max_length}_generations_test.jsonl"
         generate_sequences(args.model_name, 10, 50, output_file, args.use_local_weights, logger, test=True)
-
         print(f"Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}")
-        logger.finish()
-    
+       
     else: 
-         # Make logger 
-        logger = Logger(**vars(args))
-
-        os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
-
         output_file = f"{args.data_dir}/{args.model_name}/{args.num_sequences}_{args.max_length}_generations.jsonl"
-        
         generate_sequences(args.model_name, args.num_sequences, args.max_length, output_file, args.use_local_weights, logger)
-
         print(f"Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}")
-        logger.finish()
+    
+    logger.finish()
     

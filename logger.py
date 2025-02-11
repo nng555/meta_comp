@@ -1,6 +1,7 @@
 import os
 import wandb
 import logging
+import warning
 
 def add_log_args(parser):
     parser.add_argument("--logger", type=str, choices=["local", "wandb", "both", None], default=None, help="Log metrics to local only, wandb, or both")
@@ -38,7 +39,7 @@ class Logger:
             self.log_locally = False
         
         if not self.log_to_wandb and not self.log_locally:
-            raise Warning("No logging mode selected. To log results, select one of 'wandb', 'local', or 'both'")
+            warning.warn("\n\n\n\n WARNING: No logging mode selected. To log results, select one of 'wandb', 'local', or 'both'. Only Hydra/slurm logging will be generated. \n\n\n\n")
     
     def log(self, metrics):
         """Logs to wandb or writes to a file, based on the mode."""     

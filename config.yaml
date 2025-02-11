@@ -1,7 +1,7 @@
 defaults:
   - override hydra/launcher: slurm
 
-# Experiments
+# Experiment Arguments
 args:
   ldim: ~
   model_name: ~
@@ -17,7 +17,6 @@ args:
 command: ~
 tags: ~
 
-
 ### Logging 
 logging:
   logger: wandb # options: 'local', 'wandb', 'both'. Empty for no logging
@@ -28,7 +27,7 @@ logging:
 hydra:
   launcher:
     cpus_per_task: 30
-    mem: 200G
+    mem: 150G
     gres: gpu:1
     container: singularity
     singularity_img: /scratch/work/public/singularity/cuda12.1.1-cudnn8.9.0-devel-ubuntu22.04.2.sif

@@ -1,35 +1,33 @@
 
 import argparse
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
 import warnings
 import torch
 
 class Model:
-    
     def __init__(self, huggingface_id = "gpt2", local_path = None, use_local_weights=False):
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        print(f"Initializing Model, loading on {self.device}")
+        print(f"    Model: Initializing Model, loading on {self.device}")
 
         self.huggingface_id = huggingface_id
         self.local_path = local_path
         self.use_local_weights = use_local_weights
 
         if self.use_local_weights and self.local_path:
-            print(f"Loading model from local path {self.local_path}")
+            print(f"    Model: Loading model from local path {self.local_path}")
             self.model = AutoModelForCausalLM.from_pretrained(self.local_path).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.local_path, padding_side="left")
         else: 
             if self.use_local_weights:
                 warnings.warn("\n\n\n\n\n ******** WARNING: Parameter 'use_local_weights' is set to True but no local path was provided. Loading model from huggingface instead. *****")
-            print(f"Loading model from huggingface with huggingface id {self.huggingface_id}")
+            print(f"    Model: Loading model from huggingface with huggingface id {self.huggingface_id}")
             self.model = AutoModelForCausalLM.from_pretrained(huggingface_id).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(huggingface_id, padding_side="left")
    
     def generate(self, prompt = None, max_length = 50):
         # If a prompt is provided, generate text conditioned on the prompt
         if prompt:
-            input_ids = self.tokenizer.encode(prompt, return_tensors="pt")
+            input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(self.device)
             outputs = self.model.generate(input_ids, max_length=max_length, pad_token_id=self.tokenizer.eos_token_id)
         else:
             outputs = self.model.generate(max_length=max_length, pad_token_id=self.tokenizer.eos_token_id)
@@ -42,7 +40,7 @@ class Model:
         # Adapted from HF https://discuss.huggingface.co/t/announcement-generation-get-probabilities-for-generated-output/30075/17?u=meganrichards3
         
         Texts: a n-sized list of strings e.g ["One plus one is two", "I went to the store"] 
-        Returns: a n-sized list of floats, with return[i] representing the sum of the log probability of sequence i in the provided 'outputs'. 
+        Returns: a n-sized list of floats, with return[i] representing the sum of the log probability of sequence i. 
 
         """
         # Get the model EOS token 
@@ -180,7 +178,11 @@ class Bloom7B1(Model):
     def __init__(self, local_path=None, use_local_weights=False):
         super().__init__(huggingface_id="bigscience/bloom-7b1", local_path=local_path, use_local_weights=use_local_weights)
 
+
 def get_model(model_name, local_path= None, use_local_weights=False):
+    """
+    Purpose: Allow other scripts to instatiate a model class based on it's string and any desired model parameters. 
+    """
     if model_name in AVAILABLE_MODELS:
         return AVAILABLE_MODELS[model_name](local_path =local_path, use_local_weights=use_local_weights)
     else:
