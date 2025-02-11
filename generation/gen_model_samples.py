@@ -1,8 +1,6 @@
-from transformers import pipeline, set_seed
 import argparse
 import uuid
 from datetime import datetime
-import json
 import jsonlines
 import os 
 from logger import Logger, add_log_args

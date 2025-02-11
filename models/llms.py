@@ -1,5 +1,4 @@
 
-import argparse
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import warnings
 import torch

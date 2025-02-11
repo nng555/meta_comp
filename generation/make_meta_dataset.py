@@ -1,21 +1,18 @@
-from transformers import pipeline, set_seed
 import argparse
 import uuid
-from datetime import datetime
-import json
 import jsonlines
 import os 
 from logger import Logger, add_log_args
 from models.llms import get_model
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-import warnings
+from models.llms import Model
 
 
 def mean(lst): 
     return sum(lst) / len(lst)
 
-def compute_kl_difference(batch1, batch2, model1, model2):
+def compute_kl_difference(batch1:list[str], batch2:list[str], model1:Model, model2:Model):
     m1_m1_ll = model1.to_tokens_and_logprobs(batch1)
     m1_m2_ll = model1.to_tokens_and_logprobs(batch2)
     m2_m1_ll = model2.to_tokens_and_logprobs(batch1)
@@ -62,6 +59,7 @@ def generate_meta_dataset(model_name, model_name2, dataset1, dataset2, output_fi
                     "gen1": batch1, 
                     "gen2": batch2,
                     "metric": metric
+                    
                 }
                 data_entries.append(data_entry)
             

@@ -45,3 +45,6 @@ hydra:
 ########################################################
       #partition: gpu
 
+
+### Launching info to remember 
+# A100 partitions we can run on: cds_a100_2,a100_1,a100_2
