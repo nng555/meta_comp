@@ -5,14 +5,18 @@ from datetime import datetime
 import json
 import jsonlines
 import os 
+import sys
+sys.path.append('/Users/mr7401/Desktop/Github Repos/meta_comp')
 from logger import Logger, add_log_args
 from models.llms import get_model
 
+# Initialize logger
+logger = Logger()
 def generate_sequences(model_name, num_sequences, max_length, output_file, use_local_weights, logger):
     print(f"Writing to {output_file}")
 
     # ## Load a model and set the seed 
-    model = get_model(model_name, use_local_weights=use_local_weights)
+    model = get_model(model_name=model_name, use_local_weights=use_local_weights)
     date = datetime.now().date().isoformat()
 
     print(f"Running model on {model.device}")
@@ -40,6 +44,14 @@ def generate_sequences(model_name, num_sequences, max_length, output_file, use_l
     print("Completed Generations")
     return 
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected in the form of: True/False, T/F, Yes/No, Y/N, or 1/0')
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Generate text sequences")
@@ -47,10 +59,11 @@ if __name__ == "__main__":
     parser.add_argument('--num_sequences', type=int, required=True, help='Number of sequences to generate')
     parser.add_argument('--max_length', type=int, required=False, default = 512, help='Maximum length of each generated sequence')
     parser.add_argument('--data_dir', type=str, required=True, help='Directory to make the dataset folder in')
-    parser.add_argument('--use_local_weights', type=bool, required=False, default= True, help='If True, uses local version of stored weights rather than the HF API')
+    parser.add_argument('--use_local_weights', type=str2bool, required=False, default=False, help='If True, uses local version of stored weights rather than the HF API')
     parser=add_log_args(parser)
 
     args, unknown_args = parser.parse_known_args()
+    print(args)
     
     # Make logger 
     logger = Logger(**vars(args))
