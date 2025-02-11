@@ -10,7 +10,7 @@ def add_log_args(parser):
     return parser
 
 class Logger:
-    def __init__(self, logger="local", project="test", log_dir = ".", run_name = "test"): 
+    def __init__(self, logger="local", project="test", log_dir = ".", run_name = "test", **kwargs): 
         self.project = project
         
         # Set up WandB

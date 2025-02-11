@@ -2,18 +2,25 @@ defaults:
   - override hydra/launcher: slurm
 
 # Experiments
-tags: ~
-ldim: ~
+args:
+  ldim: ~
+  model_name: ~
+  num_sequences: 10000
+  max_length: 512
+  test: ~
+  data_dir: /scratch/mr7401/datasets/
+  use_local_weights: True
+
 command: ~
-model_name: ~
-num_generations: ~
-test: 5
+tags: ~
+
 
 ### Logging 
-logger: wandb # options: 'local', 'wandb', 'both'. Empty for no logging
-project: meta_comp 
-run_name: download_models
-log_dir: /scratch/mr7401/logs/${project}
+logging:
+  logger: wandb # options: 'local', 'wandb', 'both'. Empty for no logging
+  project: meta_comp 
+  run_name: generative_${args.num_sequences}_${args.max_length}_${oc.select:hydra.launcher.date,${now:%%m-%d}}
+  log_dir: /scratch/mr7401/logs/${logging.project}
 
 hydra:
   launcher:
@@ -28,7 +35,7 @@ hydra:
 ##### SUGGESTED HYDRA CONFIG ###########################
   sweep: 
     # subdir is built dynamically using the tags
-    dir: ${log_dir}/outputs/${run_name}
+    dir: ${logging.log_dir}/outputs/${logging.run_name}
   run:
     # once we're running set tags from conf
     dir: ${hydra.sweep.dir}/${join:${tags}}
