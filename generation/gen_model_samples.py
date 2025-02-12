@@ -63,9 +63,13 @@ if __name__ == "__main__":
     parser=add_log_args(parser)
 
     args, unknown_args = parser.parse_known_args()
+    #TODO for some reason the date for the run_name is not created correctly here. Fix! 
+    print(f"Args.run_name = {args.run_name}")
+    logging_name = f"{args.model_name}_num{args.num_sequences}_length{args.max_length}"
+    print(f"Using {logging_name} instead")
 
     # Make logger and saving folders
-    logger = Logger(**vars(args))
+    logger = Logger(group = "Generate_Samples", logging_name=logging_name, **vars(args))
     os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
    
     if args.test:

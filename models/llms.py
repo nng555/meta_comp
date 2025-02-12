@@ -27,9 +27,9 @@ class Model:
         # If a prompt is provided, generate text conditioned on the prompt
         if prompt:
             input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(self.device)
-            outputs = self.model.generate(input_ids, max_length=max_length, pad_token_id=self.tokenizer.eos_token_id)
+            outputs = self.model.generate(input_ids, max_length=max_length, do_sample=True, pad_token_id=self.tokenizer.eos_token_id)
         else:
-            outputs = self.model.generate(max_length=max_length, pad_token_id=self.tokenizer.eos_token_id)
+            outputs = self.model.generate(max_length=max_length, do_sample=True, pad_token_id=self.tokenizer.eos_token_id)
 
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
     
@@ -103,11 +103,11 @@ class Llama3_70B(Model):
 
 class Llama2_7B(Model):
     def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-2-7B", local_path=local_path, use_local_weights=use_local_weights)
+        super().__init__(huggingface_id="meta-llama/Llama-2-7B-hf", local_path=local_path, use_local_weights=use_local_weights)
 
 class Llama2_13B(Model):
     def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-2-13B", local_path=local_path, use_local_weights=use_local_weights)
+        super().__init__(huggingface_id="meta-llama/Llama-2-13B-hf", local_path=local_path, use_local_weights=use_local_weights)
 
 ### OPT Models 
 class OPT125M(Model):
@@ -143,13 +143,21 @@ class OPT66B(Model):
         super().__init__(huggingface_id="facebook/opt-66b", local_path=local_path, use_local_weights=use_local_weights)
 
 ### Gemma Models
-class Gemma2B(Model):
+class Gemma_2B(Model):
     def __init__(self, local_path=None, use_local_weights=False):
         super().__init__(huggingface_id="google/gemma-2b", local_path=local_path, use_local_weights=use_local_weights)
 
-class Gemma7B(Model):
+class Gemma_7B(Model):
     def __init__(self, local_path=None, use_local_weights=False):
         super().__init__(huggingface_id="google/gemma-7b", local_path=local_path, use_local_weights=use_local_weights)
+
+class Gemma2_2B(Model):
+    def __init__(self, local_path=None, use_local_weights=False):
+        super().__init__(huggingface_id="google/gemma-2-2b", local_path=local_path, use_local_weights=use_local_weights)
+
+class Gemma2_9B(Model):
+    def __init__(self, local_path=None, use_local_weights=False):
+        super().__init__(huggingface_id="google/gemma-2-9b", local_path=local_path, use_local_weights=use_local_weights)
 
 class CodeGemma2B(Model):
     def __init__(self, local_path=None, use_local_weights=False):
@@ -226,8 +234,10 @@ AVAILABLE_MODELS = {
     "GPT2Medium": GPT2Medium,
     "GPT2Large": GPT2Large,
     "GPT2XLarge": GPT2XLarge,
-    "Gemma2B": Gemma2B,
-    "Gemma7B": Gemma7B,
+    "Gemma_2B": Gemma_2B,
+    "Gemma_7B": Gemma_7B,
+    "Gemma2_2B": Gemma2_2B, 
+    "Gemma2_9B": Gemma2_9B,
     "CodeGemma2B": CodeGemma2B,
     "CodeGemma7B": CodeGemma7B,
     "Bloom": Bloom,
