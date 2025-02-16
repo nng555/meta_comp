@@ -27,8 +27,8 @@ def generate_meta_dataset(model_name, model_name2, dataset1, dataset2, output_fi
     model2 = get_model(model_name=model_name2, use_local_weights=use_local_weights)
     
     # Load both generation datasets 
-    d1 = load_dataset("json", data_files=dataset1, split="train", streaming=True)
-    d2 = load_dataset("json", data_files=dataset2, split="train", streaming=True)
+    d1 = load_dataset("json", data_files=dataset1, split="train", streaming=False)
+    d2 = load_dataset("json", data_files=dataset2, split="train", streaming=False)
     
     # Remove any metadata columns for efficiency
     cols_to_remove = [x for x in d1.column_names if x not in ["id", "sequence"]]

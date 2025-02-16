@@ -11,7 +11,7 @@ args:
   num_sequences: 10000
   max_length: 512
   test: False # If True, models are loaded but no generation is made. 
-  data_dir: /scratch/mr7401/meta_datasets/
+  data_dir: /scratch/mr7401/datasets_Feb16/
   use_local_weights: False # If True and we have a local path for the model, local weights will be used. 
 
 command: ~
@@ -21,13 +21,13 @@ tags: ~
 logging:
   logger: wandb # options: 'local', 'wandb', 'both'. Empty for no logging
   project: meta_comp 
-  run_name: generative_${args.num_sequences}_${args.max_length}_${oc.select:hydra.launcher.date,${now:%%m-%d}}
+  run_name: ${oc.select:hydra.launcher.date,${now:%%m-%d}}_generate_${args.num_sequences}_${args.max_length}
   log_dir: /scratch/mr7401/logs/${logging.project}
 
 hydra:
   launcher:
-    cpus_per_task: 30
-    mem: 150G
+    cpus_per_task: 40
+    mem: 100G
     gres: gpu:1
     container: singularity
     singularity_img: /scratch/work/public/singularity/cuda12.1.1-cudnn8.9.0-devel-ubuntu22.04.2.sif
