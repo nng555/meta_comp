@@ -6,20 +6,20 @@ import torch
 class Model:
     def __init__(self, huggingface_id = "gpt2", local_path = None, use_local_weights=False):
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        print(f"    Model: Initializing Model, loading on {self.device}")
+        print(f"Model: Initializing Model, loading on {self.device}", flush = True)
 
         self.huggingface_id = huggingface_id
         self.local_path = local_path
         self.use_local_weights = use_local_weights
 
         if self.use_local_weights and self.local_path:
-            print(f"    Model: Loading model from local path {self.local_path}")
+            print(f"Model: Loading model from local path {self.local_path}", flush = True)
             self.model = AutoModelForCausalLM.from_pretrained(self.local_path).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.local_path, padding_side="left")
         else: 
             if self.use_local_weights:
                 warnings.warn("\n\n\n\n\n ******** WARNING: Parameter 'use_local_weights' is set to True but no local path was provided. Loading model from huggingface instead. *****")
-            print(f"    Model: Loading model from huggingface with huggingface id {self.huggingface_id}")
+            print(f"Model: Loading model from huggingface with huggingface id {self.huggingface_id}", flush = True)
             self.model = AutoModelForCausalLM.from_pretrained(huggingface_id).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(huggingface_id, padding_side="left")
    
@@ -95,7 +95,7 @@ class Llama31_405B(Model):
 
 class Llama3_8B(Model):
     def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-3-8B", local_path=local_path, use_local_weights=use_local_weights)
+        super().__init__(huggingface_id="meta-llama/Meta-Llama-3-8B", local_path=local_path, use_local_weights=use_local_weights)
 
 class Llama3_70B(Model):
     def __init__(self, local_path=None, use_local_weights=False):

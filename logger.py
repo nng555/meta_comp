@@ -13,12 +13,12 @@ def add_log_args(parser):
 class Logger:
     def __init__(self, logger="local", project="test", log_dir = ".", logging_name = "test", group = "other", **kwargs): 
         self.project = project
-        print(f"Logging Name in WandB: {logging_name}")
-        print(f"Kwargs: {kwargs}")
+        print(f"Logger: Logging Name in WandB: {logging_name}", flush=True)
+        print(f"Logger: Kwargs = {kwargs}", flush=True)
       
         # Set up WandB
         if logger == "wandb" or logger == "both":
-            print("Setting up WandB")
+            print("Logger: Setting up WandB", flush=True)
             self.log_to_wandb = True 
             os.environ["WANDB_DIR"] = log_dir
             wandb.init(project=project, group = group, name = logging_name , config = kwargs)
@@ -28,20 +28,20 @@ class Logger:
         
         # Set up local 
         if logger == "local" or logger == "both":
-            print("Setting up local logging")
+            print("Logger: Setting up local logging", flush=True)
             self.log_locally = True
             self.local_logger = logging.getLogger(project)
 
             pid = os.getpid()  # Get process ID
             self.run_id = self.wandb_id if self.log_to_wandb else pid
 
-            os.makedirs(f"{log_dir}/outputs/{run_name}/{self.run_id}", exist_ok = True)
-            logging.basicConfig(filename=f"{log_dir}/outputs/{run_name}/{self.run_id}/local.log", level=logging.DEBUG)
+            os.makedirs(f"{log_dir}/outputs/{logging_name}/{self.run_id}", exist_ok = True)
+            logging.basicConfig(filename=f"{log_dir}/outputs/{logging_name}/{self.run_id}/local.log", level=logging.DEBUG)
         else:
             self.log_locally = False
         
         if not self.log_to_wandb and not self.log_locally:
-            warnings.warn("\n\n\n\n WARNING: No logging mode selected. To log results, select one of 'wandb', 'local', or 'both'. Only Hydra/slurm logging will be generated. \n\n\n\n")
+            warnings.warn("\n\n\n\n LOGGER WARNING: No logging mode selected. To log results, select one of 'wandb', 'local', or 'both'. Only Hydra/slurm logging will be generated. \n\n\n\n")
     
     def log(self, metrics):
         """Logs to wandb or writes to a file, based on the mode."""     
@@ -53,5 +53,3 @@ class Logger:
     def finish(self):
         if self.log_to_wandb:
             wandb.finish()
-        
-

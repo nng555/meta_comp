@@ -15,29 +15,34 @@ def generate_sequences(model_name, num_sequences, max_length, output_file, use_l
     model = get_model(model_name=model_name, use_local_weights=use_local_weights)
     date = datetime.now().date().isoformat()
 
+    print(f"Gen_Model_Samples: Starting to Generate Samples", flush=True)
     # Make a dataset file to dump 
-    with jsonlines.open(output_file, mode='w') as writer:
-
-        # Generate sequences and write iteratively to file 
-        for i in range(num_sequences):
-            
-            if i % 10 == 0 and i != 0:
-                logger.log({"Progress": i})
-        
-            # generate
-            if test:
-                sequence = "testing sequence"
-            else: 
-                sequence = model.generate(prompt="", max_length=max_length)
-            
-            data_entry = {
-                "id": str(uuid.uuid4()),
-                "sequence": sequence,
-                "model": model_name,
-                "date_generated": date
-            }
-            # save to file
-            writer.write(data_entry)
+    with jsonlines.open(output_file, mode='w', flush = True) as writer:
+        try: 
+            # Generate sequences and write iteratively to file 
+            for i in range(num_sequences):
+                
+                if i % 10 == 0:
+                    logger.log({"Progress": i})
+                  
+                # generate
+                if test:
+                    sequence = "testing sequence"
+                else: 
+                    sequence = model.generate(prompt="", max_length=max_length)
+                
+                data_entry = {
+                    "id": str(uuid.uuid4()),
+                    "sequence": sequence,
+                    "model": model_name,
+                    "date_generated": date
+                }
+                # save to file
+                writer.write(data_entry)
+        except Exception as e:
+            print(f"Gen_Model_Samples: Error: {e}", flush = True) 
+        finally: 
+            writer.flush()
     
     print("Completed Saving Generations")
     return 
@@ -64,24 +69,23 @@ if __name__ == "__main__":
 
     args, unknown_args = parser.parse_known_args()
     #TODO for some reason the date for the run_name is not created correctly here. Fix! 
-    print(f"Args.run_name = {args.run_name}")
+   
     logging_name = f"{args.model_name}_num{args.num_sequences}_length{args.max_length}"
-    print(f"Using {logging_name} instead")
-
+  
     # Make logger and saving folders
-    logger = Logger(group = "Generate_Samples", logging_name=logging_name, **vars(args))
+    logger = Logger(group = "Generate_Samples_GPU", logging_name=logging_name, **vars(args))
     os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
    
     if args.test:
         # Generates 10 sequences with max size 50 to test file
         output_file=f"{args.data_dir}/{args.model_name}/{args.num_sequences}_{args.max_length}_generations_test.jsonl"
         generate_sequences(args.model_name, 10, 50, output_file, args.use_local_weights, logger, test=True)
-        print(f"Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}")
+        print(f"Gen_Model_Samples: Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}", flush = True)
        
     else: 
         output_file = f"{args.data_dir}/{args.model_name}/{args.num_sequences}_{args.max_length}_generations.jsonl"
         generate_sequences(args.model_name, args.num_sequences, args.max_length, output_file, args.use_local_weights, logger)
-        print(f"Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}")
+        print(f"Gen_Model_Samples: Generated {args.num_sequences} sequences using model {args.model_name} and saved to {output_file}", flush = True)
     
     logger.finish()
     

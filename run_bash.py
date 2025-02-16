@@ -23,7 +23,7 @@ def launch(cfg: DictConfig):
     if cfg.logging:
         cfg.command += f" --logger={cfg.logging.logger} --project={cfg.logging.project} --log_dir={cfg.logging.log_dir} --run_name={cfg.logging.run_name}"
     
-    print(f"run_bash.py is running the following command: \n {cfg.command}")
+    print(f"Run_Bash: run_bash.py is running the following command: \n {cfg.command}")
     subprocess.run(cfg.command, shell=True)
 
 if __name__ == "__main__":
