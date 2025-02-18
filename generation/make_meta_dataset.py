@@ -1,7 +1,8 @@
 import argparse
 import uuid
 import jsonlines
-import os 
+import os
+os.sys.path.append('/scratch/mr7401/projects/meta_comp/')
 from logger import Logger, add_log_args
 from models.llms import get_model
 from datasets import load_dataset
@@ -40,7 +41,7 @@ def generate_meta_dataset(model_name, model_name2, dataset1, dataset2, output_fi
     dl1 = DataLoader(d1, batch_size=4, shuffle=False)
     dl2 = DataLoader(d2, batch_size=4, shuffle=False)
 
-    with jsonlines.open(output_file, mode='w') as writer:
+    with jsonlines.open(output_file, mode='w', flush = True) as writer:
         # Load all pairs of generations from models, and compute KL difference 
         i = 0
         for batch1 in dl1:
@@ -81,7 +82,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Make MetaDataset Between 2 Models")
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use for generation')
-    parser.add_argument('--model_name2', type=int, required=True, help='Second Model used to compare')
+    parser.add_argument('--model_name2', type=str, required=True, help='Second Model used to compare')
     parser.add_argument('--gen_dataset1', type=str, required=True, help='Path to generation file from model 1')
     parser.add_argument('--gen_dataset2', type=str, required=True, help='Path to generation file from model 2')
     parser.add_argument('--use_local_weights', type=str2bool, required=False, default=False, help='If True, uses local version of stored weights rather than the HF API')
@@ -93,7 +94,11 @@ if __name__ == "__main__":
     print(args)
 
     # Make logger 
-    logger = Logger(**vars(args))
+    
+    logging_name = f"{args.model_name}_{args.model_name2}"
+  
+    # Make logger and saving folders
+    logger = Logger(group = "MetaDataset", logging_name=logging_name, **vars(args))
 
     os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
     output_file = f"{args.data_dir}/{args.model_name}_{args.model_name2}/meta_dataset.jsonl"
