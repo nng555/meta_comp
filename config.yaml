@@ -4,14 +4,12 @@ defaults:
 # Experiment Arguments
 args:
   ldim: ~
-  model_name: OPT6_7B
-  model_name2: OPT2_7B
-  gen_dataset1: /scratch/mr7401/meta_datasets/OPT6_7B/10000_512_generations.jsonl
-  gen_dataset2: /scratch/mr7401/meta_datasets/OPT2_7B/10000_512_generations.jsonl
-  num_sequences: 10000
-  max_length: 512
+  model_name: ~
+  model_name2: ~
+  num_sequences: ~
+  max_length: ~
   test: False # If True, models are loaded but no generation is made. 
-  data_dir: /scratch/mr7401/metadatasets_Feb16/
+  data_dir: ~ # overwrite default saving directory 
   use_local_weights: False # If True and we have a local path for the model, local weights will be used. 
 
 command: ~
@@ -21,30 +19,31 @@ tags: ~
 logging:
   logger: wandb # options: 'local', 'wandb', 'both'. Empty for no logging
   project: meta_comp 
-  run_name: ${oc.select:hydra.launcher.date,${now:%%m-%d}}_metadataset_${args.num_sequences}_${args.max_length}
+  experiment: ~
+  run_name: ${oc.select:hydra.launcher.date,${now:%%m-%d-%%I%p}}
   log_dir: /scratch/mr7401/logs/${logging.project}
 
 hydra:
   launcher:
-    cpus_per_task: 20
-    mem: 50G
-    gres: gpu:0
+    cpus_per_task: 1
+    mem: 30G
+    gres: gpu:1
     container: singularity
     singularity_img: /scratch/work/public/singularity/cuda12.1.1-cudnn8.9.0-devel-ubuntu22.04.2.sif
     singularity_overlay: /scratch/mr7401/projects/pytorch-example/overlay-50G-10M.ext3 
     env_type: conda
     env_name: test
-    time: 120
+    time: 240
+    job_name: ${logging.experiment}
 ##### SUGGESTED HYDRA CONFIG ###########################
   sweep: 
     # subdir is built dynamically using the tags
-    dir: ${logging.log_dir}/outputs/${logging.run_name}
+    dir: ${logging.log_dir}/outputs/${logging.experiment}/${logging.run_name}
   run:
     # once we're running set tags from conf
     dir: ${hydra.sweep.dir}/${join:${tags}}
 ########################################################
       #partition: gpu
-
 
 ### Launching info to remember 
 # A100 partitions we can run on: cds_a100_2,a100_1,a100_2

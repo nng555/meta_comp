@@ -18,6 +18,7 @@ def generate_sequences(model_name, num_sequences, max_length, output_file, use_l
     print(f"Gen_Model_Samples: Starting to Generate Samples", flush=True)
     # Make a dataset file to dump 
     with jsonlines.open(output_file, mode='w', flush = True) as writer:
+        first_five_generations = []
         try: 
             # Generate sequences and write iteratively to file 
             for i in range(num_sequences):
@@ -39,11 +40,18 @@ def generate_sequences(model_name, num_sequences, max_length, output_file, use_l
                 }
                 # save to file
                 writer.write(data_entry)
+                if i in [0,1,2,3,4]: 
+                    first_five_generations.append(sequence)
+                if i ==4: 
+                    # Make sure we are not generating the same example over and over :)
+                    num_unique_gen = len(list(set(first_five_generations)))
+                    if num_unique_gen < 5:
+                        print(f"First 5 Generations:\n\n{first_five_generations}")
+                        raise ValueError("Identical Generations Detected in the First 5 Generations! Cancelling Job.")
+                
         except Exception as e:
             print(f"Gen_Model_Samples: Error: {e}", flush = True) 
-        finally: 
-            writer.flush()
-    
+        
     print("Completed Saving Generations")
     return 
 
@@ -61,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use for generation')
     parser.add_argument('--num_sequences', type=int, required=True, help='Number of sequences to generate')
     parser.add_argument('--max_length', type=int, required=False, default = 512, help='Maximum token length of each generated sequence')
-    parser.add_argument('--data_dir', type=str, required=True, help='Directory to make the dataset folder in. Result will be data_dir/{new_folder_with_meta_info}/{actual_data_file.jsonl}')
+    parser.add_argument('--data_dir', type=str, required=False, default = "/scratch/mr7401/datasets", help='Directory to make the dataset folder in. Result will be data_dir/{model_name}/{actual_data_file.jsonl}')
     parser.add_argument('--use_local_weights', type=str2bool, required=False, default=False, help='If True and local_path is passed (or default exists), we use the local version of stored weights rather than the HF API')
     parser.add_argument('--local_path', type=str, required=False, help='If use_local_weights is set to True, the model uses the checkpoint at this path rather than the HF API')
     parser.add_argument('--test', type=str2bool, required=False, default=False, help='If True, run this script in testing mode (testing loading the models and saving, without generation)')
