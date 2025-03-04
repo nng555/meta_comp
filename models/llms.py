@@ -244,9 +244,9 @@ AVAILABLE_MODELS = {
     "OPT1_3B": OPT1_3B,
     "OPT2_7B": OPT2_7B,
     "OPT6_7B": OPT6_7B,
-    "OPT13B": OPT13B,
-    "OPT30B": OPT30B,
-    "OPT66B": OPT66B,
+    #"OPT13B": OPT13B,
+    #"OPT30B": OPT30B,
+    #"OPT66B": OPT66B, # so big...
     "GPT2": GPT2,
     "GPT2Medium": GPT2Medium,
     "GPT2Large": GPT2Large,
