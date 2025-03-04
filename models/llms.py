@@ -1,28 +1,36 @@
-
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import warnings
 import torch
 
 class Model:
-    def __init__(self, huggingface_id = "gpt2", local_path = None, use_local_weights=False, name = ""):
+    def __init__(self, huggingface_id = "gpt2", local_path = None, use_local_weights=False, name = "", load_model = True):
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        print(f"Model: Initializing Model, loading on {self.device}", flush = True)
-
+    
         self.name = name
         self.huggingface_id = huggingface_id    
         self.local_path = local_path
         self.use_local_weights = use_local_weights
+        self.model = None
+        self.tokenizer = None
 
+        if load_model: 
+            print(f"Model: Initializing Model, device is set to: {self.device}", flush = True)
+            self.load_model_and_tokenizer()
+        else: 
+            print(f"Only loading model class, without weights loaded. ")
+    
+    def load_model_and_tokenizer(self):
         if self.use_local_weights and self.local_path:
-            print(f"Model: Loading model from local path {self.local_path}", flush = True)
-            self.model = AutoModelForCausalLM.from_pretrained(self.local_path).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(self.local_path, padding_side="left")
+                print(f"Model: Loading model from local path {self.local_path}", flush = True)
+                self.model = AutoModelForCausalLM.from_pretrained(self.local_path).to(self.device)
+                self.tokenizer = AutoTokenizer.from_pretrained(self.local_path, padding_side="left")
         else: 
             if self.use_local_weights:
                 warnings.warn("\n\n\n\n\n ******** WARNING: Parameter 'use_local_weights' is set to True but no local path was provided. Loading model from huggingface instead. *****")
             print(f"Model: Loading model from huggingface with huggingface id {self.huggingface_id}", flush = True)
-            self.model = AutoModelForCausalLM.from_pretrained(huggingface_id).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(huggingface_id, padding_side="left")
+            self.model = AutoModelForCausalLM.from_pretrained(self.huggingface_id).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.huggingface_id, padding_side="left")
+        return 
    
     def generate(self, prompt = None, max_length = 50):
         # If a prompt is provided, generate text conditioned on the prompt
@@ -84,139 +92,139 @@ class Model:
 
 ### Llama Models 
 class Llama32_1B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-3.2-1B", name="Llama32_1B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Llama-3.2-1B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Llama-3.2-1B", name="Llama32_1B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Llama32_3B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-3.2-3B", name="Llama32_3B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Llama-3.2-3B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Llama-3.2-3B", name="Llama32_3B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Llama31_8B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-3.1-8B", name="Llama31_8B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Llama-3.1-8B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Llama-3.1-8B", name="Llama31_8B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Llama31_70B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-3.1-70B", name="Llama31_70B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Llama-3.1-70B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Llama-3.1-70B", name="Llama31_70B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Llama31_405B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-3.1-405B", name="Llama31_405B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Llama-3.1-405B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Llama-3.1-405B", name="Llama31_405B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Llama3_8B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Meta-Llama-3-8B", name="Llama3_8B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Meta-Llama-3-8B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Meta-Llama-3-8B", name="Llama3_8B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Llama3_70B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-3-70B", name="Llama3_70B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Llama-3-70B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Llama-3-70B", name="Llama3_70B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Llama2_7B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-2-7B-hf", name="Llama2_7B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Llama-2-7B-hf", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Llama-2-7B-hf", name="Llama2_7B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Llama2_13B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="meta-llama/Llama-2-13B-hf", name="Llama2_13B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/meta-llama/Llama-2-13B-hf", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="meta-llama/Llama-2-13B-hf", name="Llama2_13B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 ### OPT Models 
 class OPT125M(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="facebook/opt-125m", name="OPT125M", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/facebook/opt-125m", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="facebook/opt-125m", name="OPT125M", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class OPT350M(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="facebook/opt-350m", name="OPT350M", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/facebook/opt-350m", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="facebook/opt-350m", name="OPT350M", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class OPT1_3B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="facebook/opt-1.3b", name="OPT1_3B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/facebook/opt-1.3b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="facebook/opt-1.3b", name="OPT1_3B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class OPT2_7B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="facebook/opt-2.7b", name="OPT2_7B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/facebook/opt-2.7b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="facebook/opt-2.7b", name="OPT2_7B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class OPT6_7B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="facebook/opt-6.7b", name="OPT6_7B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/facebook/opt-6.7b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="facebook/opt-6.7b", name="OPT6_7B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class OPT13B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="facebook/opt-13b", name="OPT13B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/facebook/opt-13b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="facebook/opt-13b", name="OPT13B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class OPT30B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="facebook/opt-30b", name="OPT30B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/facebook/opt-30b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="facebook/opt-30b", name="OPT30B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class OPT66B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="facebook/opt-66b", name="OPT66B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/facebook/opt-66b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="facebook/opt-66b", name="OPT66B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 ### Gemma Models
 class Gemma_2B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="google/gemma-2b", name="Gemma_2B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/google/gemma-2b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="google/gemma-2b", name="Gemma_2B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Gemma_7B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="google/gemma-7b", name="Gemma_7B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/google/gemma-7b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="google/gemma-7b", name="Gemma_7B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Gemma2_2B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="google/gemma-2-2b", name="Gemma2_2B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/google/gemma-2-2b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="google/gemma-2-2b", name="Gemma2_2B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Gemma2_9B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="google/gemma-2-9b", name="Gemma2_9B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/google/gemma-2-9b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="google/gemma-2-9b", name="Gemma2_9B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class CodeGemma2B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="google/codegemma-2b", name="CodeGemma2B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/google/codegemma-2b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="google/codegemma-2b", name="CodeGemma2B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class CodeGemma7B(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="google/codegemma-7b", name="CodeGemma7B", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/google/codegemma-7b", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="google/codegemma-7b", name="CodeGemma7B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 ### GPT Models
 class GPT2(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="gpt2", name="GPT2", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/gpt2", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="gpt2", name="GPT2", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class GPT2Medium(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="gpt2-medium", name="GPT2Medium", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/gpt2-medium", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="gpt2-medium", name="GPT2Medium", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class GPT2Large(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="gpt2-large", name="GPT2Large", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/gpt2-large", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="gpt2-large", name="GPT2Large", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class GPT2XLarge(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="gpt2-xl", name="GPT2XLarge", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/gpt2-xl", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="gpt2-xl", name="GPT2XLarge", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 ### Bloom Models
 class Bloom(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="bigscience/bloom", name="Bloom", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/bigscience/bloom", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="bigscience/bloom", name="Bloom", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Bloom560M(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="bigscience/bloom-560m", name="Bloom560M", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/bigscience/bloom-560m", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="bigscience/bloom-560m", name="Bloom560M", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Bloom1B7(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="bigscience/bloom-1b7", name="Bloom1B7", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/bigscience/bloom-1b7", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="bigscience/bloom-1b7", name="Bloom1B7", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
 class Bloom7B1(Model):
-    def __init__(self, local_path=None, use_local_weights=False):
-        super().__init__(huggingface_id="bigscience/bloom-7b1", name="Bloom7B1", local_path=local_path, use_local_weights=use_local_weights)
+    def __init__(self, local_path="model_weights/bigscience/bloom-7b1", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="bigscience/bloom-7b1", name="Bloom7B1", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
-def get_model(model_name, local_path= None, use_local_weights=False):
+def get_model(model_name, local_path= None, use_local_weights=False, load_model=True):
     """
     Purpose: Allow other scripts to instatiate a model class based on it's string and any desired model parameters. 
     """
     if model_name in AVAILABLE_MODELS:
-        return AVAILABLE_MODELS[model_name](local_path =local_path, use_local_weights=use_local_weights)
+        return AVAILABLE_MODELS[model_name](local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
     else:
         raise ValueError(f"Model {model_name} is not available. Currently available models are: {AVAILABLE_MODELS.keys()}")
 
