@@ -31,16 +31,22 @@ class Model:
             self.model = AutoModelForCausalLM.from_pretrained(self.huggingface_id).to(self.device)
             self.tokenizer = AutoTokenizer.from_pretrained(self.huggingface_id, padding_side="left")
         return 
+    
+    
+    def generate(self, prompts = None, max_length = 50, num_return_sequences = 1):
    
-    def generate(self, prompt = None, max_length = 50):
-        # If a prompt is provided, generate text conditioned on the prompt
-        if prompt:
-            input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(self.device)
-            outputs = self.model.generate(input_ids, max_length=max_length, do_sample=True, pad_token_id=self.tokenizer.eos_token_id)
+        # If any prompts are provided, generate text conditioned on the prompt
+        if prompts:
+            if isinstance(prompts, str):
+                prompts = [prompts]
+            
+            max_token_length = min([self.tokenizer.model_max_length, 10240])
+            input_ids = self.tokenizer.batch_encode_plus(prompts, return_tensors="pt", padding=True, truncation=True,  max_length= max_token_length)["input_ids"].to(self.device)
+            outputs = self.model.generate(input_ids, max_length=max_length, do_sample=True, pad_token_id=self.tokenizer.pad_token_id, eos_token_id =self.tokenizer.eos_token_id, num_return_sequences = num_return_sequences)
         else:
-            outputs = self.model.generate(max_length=max_length, do_sample=True, pad_token_id=self.tokenizer.eos_token_id)
+            outputs = self.model.generate(max_length=max_length, do_sample=True, pad_token_id=self.tokenizer.eos_token_id, num_return_sequences=num_return_sequences)
 
-        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return self.tokenizer.batch_decode(outputs, skip_special_tokens=True, padding=True)
     
     def to_tokens_and_logprobs(self, texts = ["One plus one is two"], verbose = False):
         """ 
@@ -219,6 +225,15 @@ class Bloom7B1(Model):
     def __init__(self, local_path="model_weights/bigscience/bloom-7b1", use_local_weights=False, load_model=True):
         super().__init__(huggingface_id="bigscience/bloom-7b1", name="Bloom7B1", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
 
+class Qwen2_5_0_5B(Model):
+    def __init__(self, local_path="model_weights/qwen/Qwen2.5-0.5B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="qwen/Qwen2.5-0.5B", name="Qwen2_5_0_5B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
+
+class Qwen2_5_3B(Model):
+    def __init__(self, local_path="model_weights/qwen/Qwen2.5-3B", use_local_weights=False, load_model=True):
+        super().__init__(huggingface_id="qwen/Qwen2.5-3B", name="Qwen2_5_3B", local_path=local_path, use_local_weights=use_local_weights, load_model=load_model)
+
+
 def get_model(model_name, local_path= None, use_local_weights=False, load_model=True):
     """
     Purpose: Allow other scripts to instatiate a model class based on it's string and any desired model parameters. 
@@ -257,10 +272,12 @@ AVAILABLE_MODELS = {
     "Gemma2_9B": Gemma2_9B,
     "CodeGemma2B": CodeGemma2B,
     "CodeGemma7B": CodeGemma7B,
-    "Bloom": Bloom,
-    "Bloom560M": Bloom560M,
-    "Bloom1B7": Bloom1B7,
-    "Bloom7B1": Bloom7B1
+    #"Bloom": Bloom,
+    #"Bloom560M": Bloom560M,
+    #"Bloom1B7": Bloom1B7,
+    #"Bloom7B1": Bloom7B1,
+    "Qwen2_5_0_5B": Qwen2_5_0_5B, 
+    "Qwen2_5_3B": Qwen2_5_3B
 }
 
 def get_available_llms():

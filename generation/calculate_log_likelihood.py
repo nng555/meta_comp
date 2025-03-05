@@ -22,7 +22,7 @@ Example:
     python calculate_log_likelihood.py --model_name GPT2 --data_dir /path/to/data --use_local_weights False --test False
 """
 
-def calculate_log_likelihood(model_name, output_file, use_local_weights, logger, test = False, verbose = False):
+def calculate_log_likelihood(model_name, output_file, use_local_weights, logger, test = False, n_subset = None, verbose = False):
     
     # Load Model 
     model1 = get_model(model_name=model_name, use_local_weights=use_local_weights)
@@ -32,15 +32,19 @@ def calculate_log_likelihood(model_name, output_file, use_local_weights, logger,
         
         # For all model generations, including model 1, iterate the generations dataset and calculate the log likelihood 
         # of the samples under model 1. Write all into to a file with the ID. 
-        
+
         total_complete = 0
         
-        for model_name2 in ["OPT125M"]:
+        for model_name2 in ["OPT125M", "OPT350M", "OPT2_7B", "OPT6_7B", "GPT2", "GPT2Large", "Gemma2_2B"]:
             print(f"Calculate_Log_Likelihood: Starting to calculate LL for {model_name2}'s generations...", flush = True)
             per_model_complete = 0
             
             # Load generation dataset
-            d2 =load_dataset("json", data_files=f"/scratch/mr7401/datasets/{model_name2}/10000_512_generations.jsonl", split="train", streaming=False)
+            d2 = load_dataset("json", data_files=f"/scratch/mr7401/generations_no_prompts/{model_name2}/10000_512_generations.jsonl", split="train", streaming=False)
+            
+            # Subset if requested 
+            if n_subset is not None:
+                d2 = d2.select(range(n_subset))
             
             # Remove extraneous metadata columns
             cols_to_remove = [x for x in d2.column_names if x not in ["id", "sequence"]]
@@ -98,7 +102,9 @@ if __name__ == "__main__":
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use for generation')
     parser.add_argument('--data_dir', type=str, required=False, default="/scratch/mr7401/log_likelihoods", help='Path to directory to save data in')
     parser.add_argument('--use_local_weights', type=str2bool, required=False, default=False, help='If True, uses local version of stored weights rather than the HF API')
+    parser.add_argument('--n_subset', type=int, required=False, default=None, help='If provided, only uses the first n_subset samples from the generation dataset')
     parser.add_argument('--test', type=str2bool, required=False, default=False, help='If True, run this script in testing mode (manual override of variables)')
+    
     parser=add_log_args(parser)
 
     args, unknown_args = parser.parse_known_args()
@@ -113,14 +119,17 @@ if __name__ == "__main__":
     
     os.makedirs(f"{args.data_dir}", exist_ok=True)
     os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
-    output_file = f"{args.data_dir}/{args.model_name}/log_likelihood_opt350.jsonl"
+    if args.n_subset is not None:
+        output_file = f"{args.data_dir}/{args.model_name}/log_likelihood_{args.n_subset}.jsonl"
+    else: 
+        output_file = f"{args.data_dir}/{args.model_name}/log_likelihood.jsonl"
     
     if os.path.exists(output_file): 
         new_output_file = f"{args.data_dir}/{args.model_name}/log_likelihood_NEW.jsonl"
         warnings.warn(f"\n\n\n\nWARNING: Output File {output_file} already exists. Saving to {new_output_file} instead.")
         output_file = new_output_file
         
-    calculate_log_likelihood(args.model_name, output_file, args.use_local_weights, logger, verbose = False)
+    calculate_log_likelihood(model_name=args.model_name, output_file= output_file, use_local_weights=args.use_local_weights, logger=logger, n_subset=args.n_subset, verbose = False)
 
     print(f"Calculated Log Likelihood for All Datasets Under {args.model_name} and saved to {output_file}", flush = True)
     logger.finish()
