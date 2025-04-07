@@ -37,7 +37,12 @@ def make_kde_plot(data, model1, model2, smoothing = 5):
         "Llama31_8B": "Llama 3.1 8B",
         "Llama32_3B": "Llama 3.2 3B",
         "OPT125M": "OPT_125M",
-        "OPT350M": "OPT350M" 
+        "OPT350M": "OPT350M", 
+        "Qwen2_5_0_5B": "Qwen 2.5 0.5B",
+        "Qwen2_5_3B": "Qwen 2.5 3B",
+        "Gemma2_2B": "Gemma2 2B",
+        "GPT2": "GPT-2",
+        "GPT2Large": "GPT-2 Large"
     }
     
     fig= plt.figure(figsize=(8, 5))
@@ -50,13 +55,7 @@ def make_kde_plot(data, model1, model2, smoothing = 5):
     
     sns.kdeplot(data=data, fill=True, color='blue')
     plt.axvline(x=0, color='r', linestyle='--', linewidth=2)
-    #if data[0] != data[1]:
-    #    mean_value = mean(data)
-    #else: 
-    #    mean_value = 0
-    #plt.axvline(x=mean_value, color='blue', linestyle='--', label = f"Mean = {mean(data)}", linewidth=1)
-    #plt.text(x =mean_value, y = 0.05, s = f"Mean = {mean(data)}",transform=plt.gca().transAxes, fontsize=10, color='blue')
-     
+
     # Labels and title
     plt.xlabel("KL Difference")
     plt.ylabel("Density")
@@ -68,10 +67,9 @@ def make_kde_plot(data, model1, model2, smoothing = 5):
         
     plt.title(f"{model1} vs {model2}")
     
-    plt.text(x=0.75, y=0.95, s=f"Num_Samples={len(data)*smoothing/2}", transform=plt.gca().transAxes, fontsize=10, color='grey')
+    plt.text(x=0.75, y=0.95, s=f"Num_Samples={int(len(data)*smoothing/2)}", transform=plt.gca().transAxes, fontsize=10, color='grey')  
     plt.text(x=0.75, y=0.90, s=f"Smoothing={smoothing}", transform=plt.gca().transAxes, fontsize=10, color='grey')
     plt.text(x=0.75, y=0.85, s="Prompt=None", transform=plt.gca().transAxes, fontsize=10, color='grey')
-    
     plt.text(x=0.75, y=0.80, s=f"----- Stats -----", transform=plt.gca().transAxes, fontsize=10, color='blue')
     plt.text(x=0.75, y=0.75, s="T-Test p<0.01=", transform=plt.gca().transAxes, fontsize=10, color='grey')
     plt.text(x=0.905, y=0.75, s=t_text, transform=plt.gca().transAxes, fontsize=10, color=t_color)
@@ -81,14 +79,14 @@ def make_kde_plot(data, model1, model2, smoothing = 5):
     
     # Show plot
     plt.tight_layout()
-    plt.xlim(min(-10, min(data)), 5000)
+    plt.xlim(-4000, 4000)
    
 
     now = datetime.now()
     formatted_date = now.strftime("%B_%d_%H")
-    os.makedirs(f"/scratch/mr7401/projects/meta_comp/plots/kde_{formatted_date}", exist_ok =True)
+    os.makedirs(f"/scratch/mr7401/projects/meta_comp/plots/kde_{formatted_date}_Smoothing={smoothing}", exist_ok =True)
     
-    plt.savefig(f"/scratch/mr7401/projects/meta_comp/plots/kde_{formatted_date}/{model1}_vs_{model2}.pdf", format = "pdf")
+    plt.savefig(f"/scratch/mr7401/projects/meta_comp/plots/kde_{formatted_date}_Smoothing={smoothing}/{model1}_vs_{model2}.pdf", format = "pdf")
     plt.show()
     return fig
 
@@ -99,15 +97,44 @@ def compute_kl_difference(m1_m1_ll, m1_m2_ll, m2_m1_ll, m2_m2_ll):
     kl_diff = -(mean(m1_m1_ll) + mean(m1_m2_ll)) + (mean(m2_m1_ll) + mean(m2_m2_ll))
     return kl_diff
     
+def load_log_likelihoods(model_name): 
+
+    # paths = [
+    #     f"/scratch/mr7401/log_likelihoods/{model_name}/log_likelihood_NEW.jsonl",
+    #     f"/scratch/mr7401/log_likelihoods/{model_name}/log_likelihood_2000.jsonl",
+    #     f"/scratch/mr7401/log_likelihoods_rerun_old/{model_name}/log_likelihood_NEW.jsonl", 
+    #     f"/scratch/mr7401/log_likelihoods_rerun_old/{model_name}/log_likelihood_2000.jsonl"
+    #     ]
+    paths = [
+        f"/scratch/mr7401/log_likelihoods_Truncation_Fixed/{model_name}/log_likelihood_NEW.jsonl",
+        f"/scratch/mr7401/log_likelihoods_Truncation_Fixed/{model_name}/log_likelihood_2000.jsonl",
+        ]
+    
+    valid_paths = []
+    for path in paths: 
+        if os.path.exists(path): 
+            valid_paths.append(path)
+
+            print(f"Including {path}...")
+    
+    return load_dataset("json", data_files= valid_paths, split="train", streaming=False)
+
 def generate_kl_diffs(m1 = "OPT2_7B", m2 = "OPT6_7B", smoothing = 5): 
+    if m1 == m2: 
+        return []
 
     # Load LL Data
-    m1_lls = load_dataset("json", data_files= f"/scratch/mr7401/log_likelihoods/{m1}/log_likelihood_fixed.jsonl", split="train", streaming=False)
-    m2_lls = load_dataset("json", data_files= f"/scratch/mr7401/log_likelihoods/{m2}/log_likelihood_fixed.jsonl", split="train", streaming=False)
-    
+    print(f"\n\n\n Starting Plotting for {m1} and {m2}")
+    m1_lls = load_log_likelihoods(m1)
+    m2_lls = load_log_likelihoods(m2)
+
     # Convert to Pandas for join
     df1 = m1_lls.to_pandas()
     df2 = m2_lls.to_pandas()
+
+    # Drop duplicates if any present 
+    df1 = df1.drop_duplicates(subset=["generation_id"])
+    df2 = df2.drop_duplicates(subset=["generation_id"])
     
     # Select only comparison models 
     df1=df1[df1["gen_source_model"].isin([m1,m2])]
@@ -119,7 +146,8 @@ def generate_kl_diffs(m1 = "OPT2_7B", m2 = "OPT6_7B", smoothing = 5):
     # Checks: confirm all samples matched, and all samples with matching IDs have matching sequences
     assert merged_df[f"{m1}_ll"].isna().sum() ==0 
     assert merged_df[f"{m2}_ll"].isna().sum() ==0 
-    assert (merged_df["generation_x"] == merged_df["generation_y"]).sum() == len(merged_df)
+    #assert (merged_df["generation_x"] == merged_df["generation_y"]).sum() == len(merged_df)
+    merged_df = merged_df[merged_df["generation_x"] == merged_df["generation_y"]]
 
     kl_divs = []
     
@@ -144,12 +172,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plots")
     args, unknown_args = parser.parse_known_args()
 
-    models = ["OPT125M", "OPT350M", "OPT2_7B", "OPT6_7B"]
-    smoothing=5
-    for m1 in models: 
-        for m2 in models: 
-            try:
-                kl_diffs = generate_kl_diffs(m1 = m1, m2=m2, smoothing=smoothing) 
-                plots = make_kde_plot(data = kl_diffs, model1 = m1, model2 = m2)
-            except Exception as e: 
-                print(e)
+    models = ["OPT125M", "OPT350M", "OPT2_7B", "OPT6_7B", "Qwen2_5_0_5B","Qwen2_5_3B","Gemma2_2B","GPT2","GPT2Large","Llama31_8B","Llama32_3B"]
+    for smoothing in [1,5,10]:
+        for m1 in models: 
+            for m2 in models: 
+                if m1 != m2:
+                    try:
+                        kl_diffs = generate_kl_diffs(m1 = m1, m2=m2, smoothing=smoothing) 
+                        plots = make_kde_plot(data = kl_diffs, model1 = m1, model2 = m2, smoothing=smoothing)
+                    except Exception as e: 
+                        print(f"EXCEPTION: {e}", flush = True)

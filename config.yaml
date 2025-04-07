@@ -11,6 +11,7 @@ args:
   test: False # If True, models are loaded but no generation is made. 
   data_dir: ~ # overwrite default saving directory 
   use_local_weights: False # If True and we have a local path for the model, local weights will be used. 
+  n_subset: ~
 
 command: ~
 tags: ~
@@ -26,7 +27,7 @@ logging:
 hydra:
   launcher:
     cpus_per_task: 1
-    mem: 30G
+    mem: 1G
     gres: gpu:1
     container: singularity
     singularity_img: /scratch/work/public/singularity/cuda12.1.1-cudnn8.9.0-devel-ubuntu22.04.2.sif
@@ -35,6 +36,7 @@ hydra:
     env_name: test
     time: 240
     job_name: ${logging.experiment}
+    #partition: ~ #a100_1,a100_2
 ##### SUGGESTED HYDRA CONFIG ###########################
   sweep: 
     # subdir is built dynamically using the tags

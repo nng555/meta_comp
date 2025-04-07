@@ -3,12 +3,15 @@ import uuid
 import jsonlines
 import os
 os.sys.path.append('/scratch/mr7401/projects/meta_comp/')
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
 from logger import Logger, add_log_args
 from models.llms import get_model
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from models.llms import Model
 import warnings
+
 
 """
 Purpose: The goal of this script is to improve efficiency by calculating the log likelihood of all generations under 1 model at a time. 
@@ -24,66 +27,91 @@ Example:
 
 def calculate_log_likelihood(model_name, output_file, use_local_weights, logger, test = False, n_subset = None, verbose = False):
     
+    if verbose or test:
+        os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+        os.environ["TORCH_USE_CUDA_DSA"] = "1"
     # Load Model 
     model1 = get_model(model_name=model_name, use_local_weights=use_local_weights)
     
     print(f"Calculate_Log_Likelihood: Opening output file and starting to load generation datasets...", flush = True)
-    with jsonlines.open(output_file, mode='w', flush = True) as writer:
+    with jsonlines.open(output_file, mode='a', flush = True) as writer:
         
         # For all model generations, including model 1, iterate the generations dataset and calculate the log likelihood 
         # of the samples under model 1. Write all into to a file with the ID. 
 
         total_complete = 0
+        #OPT125M,OPT350M,OPT2_7B,OPT6_7B,GPT2,GPT2Large,Qwen2_5_0_5B,Qwen2_5_3B,Gemma_2B
         
-        for model_name2 in ["OPT125M", "OPT350M", "OPT2_7B", "OPT6_7B", "GPT2", "GPT2Large", "Gemma2_2B"]:
+        for model_name2 in ["Qwen2_5_3B", "Qwen2_5_0_5B", "Llama31_8B","Llama32_3B", "Gemma2_2B", "OPT125M", "OPT350M", "OPT2_7B", "OPT6_7B", "GPT2", "GPT2Large"]: 
             print(f"Calculate_Log_Likelihood: Starting to calculate LL for {model_name2}'s generations...", flush = True)
             per_model_complete = 0
             
-            # Load generation dataset
-            d2 = load_dataset("json", data_files=f"/scratch/mr7401/generations_no_prompts/{model_name2}/10000_512_generations.jsonl", split="train", streaming=False)
-            
-            # Subset if requested 
-            if n_subset is not None:
-                d2 = d2.select(range(n_subset))
-            
-            # Remove extraneous metadata columns
-            cols_to_remove = [x for x in d2.column_names if x not in ["id", "sequence"]]
-            if len(cols_to_remove) > 0:
-                d2 = d2.remove_columns(cols_to_remove)
-
-            # Make dataloader
-            batch_size = 4
-            dl2 = DataLoader(d2, batch_size=batch_size, shuffle=False)
-
-            # Iterate dataloader, calculating log prob under model 1
-
-            for batch in dl2:
-                if verbose: 
-                    print(f"    Batch size = {len(batch['sequence'])}, \n Batch = {batch}", flush=True)
-                    print(f"    Example batch sequence: {batch["sequence"][0]}", flush = True)
+            try: 
+                # Load generation dataset
+                path = f"/scratch/mr7401/generations_no_prompts/{model_name2}/10000_512_generations.jsonl"
+                if not os.path.exists(path):
+                    print(f"    Path {path} does not exist. Trying 2000 subset", flush = True)
+                    path = f"/scratch/mr7401/generations_no_prompts/{model_name2}/2000_512_generations.jsonl"  
+                    print(f"    {path} exists: {os.path.exists(path)}", flush = True)
+                    
+                d2 = load_dataset("json", data_files=path, split="train", streaming=False)
+                # Subset if requested 
+                if n_subset is not None:
+                    d2 = d2.select(range(n_subset))
                 
-                gen_log_likelihood = model1.to_tokens_and_logprobs(batch["sequence"], verbose = False) # This will produce a list with shape [batch_size]
+                # Remove extraneous metadata columns
+                cols_to_remove = [x for x in d2.column_names if x not in ["id", "sequence"]]
+                if len(cols_to_remove) > 0:
+                    d2 = d2.remove_columns(cols_to_remove)
 
-                if verbose: 
-                    print(f"    Gen Log Likelihood: {gen_log_likelihood}", flush=True)
-                
-                # Make dataset items (N = batch_size) and write them to a file
-        
-                for i in range(batch_size):
-                    total_complete = total_complete + 1
-                    per_model_complete = per_model_complete + 1
-                    data_entry = {
-                        "gen_source_model": model_name2,
-                        "generation": batch["sequence"][i], 
-                        "generation_id": batch["id"][i],
-                        f"{model1.name}_ll": gen_log_likelihood[i]                
-                    }
-                    writer.write(data_entry)
-                
-                logger.log({f"{model_name2}_Complete": per_model_complete})
-                logger.log({"Total Complete": total_complete})
+                # Make dataloader
+                batch_size = 1
+                logger.log({"Using Batch Size": batch_size})
+                dl2 = DataLoader(d2, batch_size=batch_size, shuffle=False)
+
+                # Iterate dataloader, calculating log prob under model 1
+
+                for batch in dl2:
+                    # Skip any elements that are empty strings
+                    batch["sequence"] = [seq for seq in batch["sequence"] if seq.strip() != ""]
+                    batch["id"] = [batch["id"][i] for i in range(len(batch["sequence"])) if batch["sequence"][i].strip() != ""]
+                    
+                    if len(batch["sequence"])>0:
+                        if verbose: 
+                            print(f"    Batch size = {len(batch['sequence'])}, \n Batch = {batch}", flush=True)
+                        try: 
+                            gen_log_likelihood = model1.to_tokens_and_logprobs(batch["sequence"], verbose = verbose) # This will produce a list with shape [batch_size]
+
+                            if verbose: 
+                                print(f"    Gen Log Likelihood: {gen_log_likelihood}", flush=True)
+                            
+                            # Make dataset items (N = batch_size) and write them to a file
+                            for i in range(len(batch["sequence"])):
+                                if i < len(batch["id"]):
+                                    total_complete = total_complete + 1
+                                    per_model_complete = per_model_complete + 1
+                                    data_entry = {
+                                        "gen_source_model": model_name2,
+                                        "generation": batch["sequence"][i], 
+                                        "generation_id": batch["id"][i],
+                                        f"{model1.name}_ll": gen_log_likelihood[i]                
+                                    }
+                                    writer.write(data_entry)
+                                else: 
+                                    warnings.warn(f"Warning: A generation after {per_model_complete} calculations did not have a batch id, a batch sequence, and a log likelihood. " 
+                                                  f"    - Information: \nLen(Batch[)={len(batch["sequence]"])}, Len(Gen_Log_Likelihood) = {len(gen_log_likelihood)}\n")
+                                
+                            
+                            logger.log({f"{model_name2}_Complete": per_model_complete})
+                            logger.log({"Total Complete": total_complete})
+                        except Exception as e:
+                            print(f"    Calculating the log likelihood of the following batch failed: \n Batch: {batch["sequence"]}\nSpecific Error: {e} \nSkipping.", flush = True)
+                    
+                print(f"    Completed batches")
             
-            print(f"Completed batches")
+            except Exception as e:
+                print(f"Calculate_Log_Likelihood: Error: {e}", flush = True)
+                logger.log({"Error": e})
                                   
     return  
 
@@ -128,7 +156,7 @@ if __name__ == "__main__":
         new_output_file = f"{args.data_dir}/{args.model_name}/log_likelihood_NEW.jsonl"
         warnings.warn(f"\n\n\n\nWARNING: Output File {output_file} already exists. Saving to {new_output_file} instead.")
         output_file = new_output_file
-        
+    
     calculate_log_likelihood(model_name=args.model_name, output_file= output_file, use_local_weights=args.use_local_weights, logger=logger, n_subset=args.n_subset, verbose = False)
 
     print(f"Calculated Log Likelihood for All Datasets Under {args.model_name} and saved to {output_file}", flush = True)
