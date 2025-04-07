@@ -65,6 +65,73 @@ class Model:
 
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True, padding=True)
     
+    def calculate_perplexity(self, text, device="cpu", verbose=False, context_window_limit=None, stride_denominator=2):
+        """
+        Purpose: Calculate the perplexity of a given text using the model.
+        ## Source: adapted from https://huggingface.co/docs/transformers/perplexity 
+        ## Relevant: https://thegradient.pub/understanding-evaluation-metrics-for-language-models/"""
+        encodings = self.tokenizer([text], return_tensors="pt")
+        if context_window_limit is not None:
+            max_length = min(self.max_token_length, context_window_limit)
+        else:
+            max_length = self.max_token_length
+
+        stride = max_length // stride_denominator
+
+        seq_len = encodings.input_ids.size(1)
+        if verbose:
+            print(f"sequence length: {seq_len}, stride = {stride}, max_length = {max_length}")
+
+        nll_sum = 0.0
+        n_tokens = 0
+        prev_end_loc = 0
+
+        for begin_loc in range(0, seq_len, stride):
+            end_loc = min(begin_loc + max_length, seq_len)
+            trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
+            input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
+            target_ids = input_ids.clone()
+            target_ids[:, :-trg_len] = -100
+
+            if verbose:
+                print(f"------\nProcessing tokens from {begin_loc} to {end_loc}")
+                print(f"Target length (trg_len): {trg_len}")
+                # Decode and print each token in the current input_ids
+                tokens = self.tokenizer.convert_ids_to_tokens(input_ids[0])
+                for idx, token in enumerate(tokens):
+                    print(f"    Token {idx + begin_loc}: {token}")
+
+            with torch.no_grad():
+                outputs = self.model(input_ids, labels=target_ids)
+                neg_log_likelihood = outputs.loss
+
+            num_valid_tokens = (target_ids != -100).sum().item()  # number of valid tokens in target_ids
+            batch_size = target_ids.size(0)
+            num_loss_tokens = num_valid_tokens - batch_size  # subtract batch_size due to internal label shift
+            nll_sum += neg_log_likelihood * num_loss_tokens
+            n_tokens += num_loss_tokens
+
+            if verbose:
+                print(f"\nString Subset Statistics (Token Range: {begin_loc}-{end_loc}):")
+                print(f"    Negative Log-Likelihood: {neg_log_likelihood}")
+                print(f"    Number of valid tokens: {num_valid_tokens}")
+                print(f"    Number of loss tokens: {num_loss_tokens}")
+                print(f"    Accumulated NLL Sum: {nll_sum}")
+                print(f"    Total Tokens Processed: {n_tokens}")
+
+            prev_end_loc = end_loc
+            if end_loc == seq_len:
+                break
+
+        avg_nll = nll_sum / n_tokens  # average negative log-likelihood per token
+        ppl = torch.exp(avg_nll)
+        if verbose:
+            print(f"\nCombined Statistics (over {n_tokens} Tokens):")
+            print(f"    Total NLL Sum: {nll_sum}")
+            print(f"    Average NLL: {avg_nll}")
+            print(f"    Perplexity: {ppl}")
+        return ppl, avg_nll
+
     
     def to_tokens_and_logprobs(self, texts = ["One plus one is two"], verbose = False):
         """ 
