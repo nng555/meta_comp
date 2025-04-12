@@ -70,7 +70,7 @@ class Model:
         Purpose: Calculate the perplexity of a given text using the model.
         ## Source: adapted from https://huggingface.co/docs/transformers/perplexity 
         ## Relevant: https://thegradient.pub/understanding-evaluation-metrics-for-language-models/"""
-        encodings = self.tokenizer([text], return_tensors="pt")
+        encodings = self.tokenizer([text], return_tensors="pt").to(self.device)
         if context_window_limit is not None:
             max_length = min(self.max_token_length, context_window_limit)
         else:
@@ -90,7 +90,7 @@ class Model:
             end_loc = min(begin_loc + max_length, seq_len)
             trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
             input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
-            target_ids = input_ids.clone()
+            target_ids = input_ids.clone().to(self.device)
             target_ids[:, :-trg_len] = -100
 
             if verbose:

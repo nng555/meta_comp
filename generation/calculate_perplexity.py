@@ -54,8 +54,16 @@ def calculate_perplexity(model_name, output_file, use_local_weights, logger, tes
         class NYTArticlesDataset(Dataset):
             def __init__(self, csv_file, n_subset=None):
                 df = pd.read_csv(csv_file)
+                # Filter out rows where 'text' column has empty strings
+                df = df[df['text'].str.strip() != ""]
+                # Filter out rows where 'web_url' column has empty strings
+                df = df[df['web_url'].str.strip() != ""]
+                # Filter out na in web_url or text 
+                df = df.dropna(subset=['web_url', 'text'])
+                
                 self.data = df['text'].tolist()
                 self.ids = df['web_url'].tolist()
+                
                 if n_subset is not None:
                     self.data = self.data[:n_subset]
                     self.ids = self.ids[:n_subset]
@@ -73,10 +81,7 @@ def calculate_perplexity(model_name, output_file, use_local_weights, logger, tes
         
         print(f"Calculate_Perplexity: Starting to calculate perplexity for the toy dataset...", flush=True)
         for batch in dataloader:
-            # Skip any elements that are empty strings
-            batch["sequence"] = [seq for seq in batch["sequence"] if seq.strip() != ""]
-            batch["id"] = [batch["id"][i] for i in range(len(batch["sequence"])) if batch["sequence"][i].strip() != ""]
-            
+  
             if len(batch["sequence"]) > 0:
                 if verbose:
                     print(f"    Batch size = {len(batch['sequence'])}, \n Batch = {batch}", flush=True)
