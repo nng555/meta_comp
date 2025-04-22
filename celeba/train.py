@@ -27,10 +27,10 @@ def collator(batch):
 
 @app.command()
 def train(
-        nepochs: int=15,
-        latent_dim: int=128,
-        bsize: int=16,
-        lr: float=1e-3,
+    nepochs: int=15,
+    latent_dim: int=128,
+    bsize: int=16,
+    lr: float=1e-3,
 ):
 
     # load dataset

@@ -1,4 +1,5 @@
 import torch
+from einops import rearrange
 import itertools
 import numpy as np
 import torch.nn as nn
@@ -18,6 +19,8 @@ class MetaDataset(Dataset):
         return self.x[idx], self.y[idx] # M x D, M x M
 
 def gen_collate_fn(nmodels, batch_size, max_samples):
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def collate_fn(batch): # B x 2 x N
 
@@ -44,13 +47,22 @@ def gen_collate_fn(nmodels, batch_size, max_samples):
         batch_y = [(by[:, ms, ms2] - by[:, ms2, ms]).mean() for (by, ms, ms2) in zip(batch_y, model_select, model_select2)]
         batch_y = torch.Tensor(batch_y)
 
-        return batch_x1, batch_x2, torch.Tensor(x_lengths), batch_y
+        x_lengths = torch.Tensor(x_lengths).to(device)
+        batch_y = batch_y.to(device)
+
+        return batch_x1, batch_x2, x_lengths, batch_y
 
     return collate_fn
 
+def interleave_batch(x1, x2):
+    return  rearrange([x1, x2], 't b n d -> b (n t) d')
+
+def uninterleave_batch(x):
+    return x[:, ::2], x[:, 1::2]
+
 class SetBatchSampler(BatchSampler):
 
-    def __init__(self, batch_size, sampler, min_samples=10, max_samples=30):
+    def __init__(self, batch_size, sampler, min_samples=20, max_samples=30):
         super(SetBatchSampler, self).__init__(sampler, batch_size, drop_last=True)
         self.min_samples = min_samples
         self.max_samples = max_samples

@@ -3,15 +3,20 @@ from tqdm import tqdm
 import torch
 import numpy as np
 from utils import MetaDataset, gen_collate_fn, SetBatchSampler
-from set_transformer2 import SetTransformer2
+from set_transformer2 import *
 from torch.optim import AdamW
+import wandb
+np.set_printoptions(suppress=True)
+
+wandb.login()
+run = wandb.init(project="neural_test_statistics")
 
 def build_loader(dataset, batch_size, collate_fn):
     base_sampler = RandomSampler(dataset)
     batch_sampler = SetBatchSampler(batch_size, base_sampler)
     return DataLoader(dataset, batch_sampler=batch_sampler, collate_fn=collate_fn)
 
-def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_samples=30):
+def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_samples=30, loss_fn='mse', temperature=1.0):
 
     nmodels = train_data.x.shape[1]
     collate_fn = gen_collate_fn(nmodels, batch_size, max_samples)
@@ -23,32 +28,69 @@ def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_sam
         for batch in train_loader:
             optim.zero_grad()
             x1, x2, x_lengths, y = batch
-            out = model(x1, x2, x_lengths).squeeze()
-            loss = torch.mean((out - torch.abs(y))**2)
+            out = model(x1, x2, x_lengths)
+            if loss_fn == 'mse':
+                out = out.squeeze()
+                loss = torch.mean((F.relu(out) - torch.abs(y))**2)
+            elif loss_fn == 'mse_dir':
+                mag_loss = torch.mean((out[0].squeeze() - torch.abs(y))**2)
+                dir_loss = F.binary_cross_entropy_with_logits(out[1].squeeze(), (y > 0).float())
+                loss = mag_loss + dir_loss
+            elif loss == "bce":
+                out = out.squeeze()
+                out /= temperature
+                y /= temperature
+                py = F.sigmoid(y)
+                loss = F.binary_cross_entropy_with_logits(out, py)
             losses.append(loss.item())
+            if loss_fn == 'mse_dir':
+                wandb.log({'mse_loss': mag_loss.item(),
+                           'bce_loss': dir_loss.item(),
+                           'bce_acc': ((out[1].squeeze() > 0) == (y > 0)).float().mean(),
+                           'mse_dir_loss': loss.item(),
+                })
+                out = out[0].squeeze() * ((out[1].squeeze() > 0).float() * 2 - 1)
+            else:
+                wandb.log({loss_fn + "_loss": loss.item()})
             loss.backward()
             optim.step()
-        print(np.mean(losses))
+        if (epoch + 1) % 100 == 0:
+            print(out.detach().cpu().numpy())
+            print(y.cpu().numpy())
+        #print(np.mean(losses))
 
 if __name__ == "__main__":
 
     max_samples = 30
     torch.manual_seed(0)
     np.random.seed(0)
-    model = SetTransformer2(
+    model = SetTransformer5(
         n_inputs=64,
         n_outputs=1,
-        n_enc_layers=4,
-        dim_hidden=64,
+        n_enc_layers=3,
+        dim_hidden=128,
         norm='set_norml',
         sample_size=max_samples,
     )
 
+    if torch.cuda.is_available():
+        print("Using CUDA")
+        device = torch.device("cuda")
+        model.to(device)
+    else:
+        device = torch.device('cpu')
+
     train_data = np.load('data/meta_train.npy', allow_pickle=True).item()
     test_data = np.load('data/meta_test.npy', allow_pickle=True).item()
 
-    train_data = MetaDataset(torch.Tensor(train_data['x']), torch.Tensor(train_data['y']))
-    test_data = MetaDataset(torch.Tensor(test_data['x']), torch.Tensor(test_data['y']))
+    train_data = MetaDataset(
+        torch.Tensor(train_data['x']).to(device),
+        torch.Tensor(train_data['y']).to(device),
+    )
+    test_data = MetaDataset(
+        torch.Tensor(test_data['x']).to(device),
+        torch.Tensor(test_data['y']).to(device),
+    )
 
-    train(model, 500, train_data, test_data, max_samples=max_samples)
+    train(model, 1000, train_data, test_data, max_samples=max_samples, loss_fn='mse_dir', temperature=1)
 
