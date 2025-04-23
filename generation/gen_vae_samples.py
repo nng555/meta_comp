@@ -3,27 +3,37 @@ import uuid
 from datetime import datetime
 import jsonlines
 import os 
-from logger import Logger, add_log_args
-from models.llms import get_model
+from logger import Logger, add_log_args # LOGGING can delete if you don't want to use the logger class. 
 import warnings
 from datasets import load_dataset
 import torch 
 from torchvision.transforms.functional import to_pil_image
 
-def generate_images(model_name, num_generations, checkpoint_dir, save_dir, logger, test=False):
+def generate_images(model_name: str = "ldim_2", num_generations: int = 10, checkpoint_dir: str = "/metacomp/checkpoints/", save_dir:str = "/scratch/mr7401/vae_generations/", logger: Logger = None, test=False):
     if test: 
         warnings.warn("\n\n\n\n******** WARNING: gen_model_samples.py is running in testing mode! This means the model is loaded, but not used for the actual generations. ********\n\n\n\n ")
 
     # Load a model 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    m1 = torch.load(f"{checkpoint_dir}/{model_name}_e19.pt", weights_only=False)
-    m1.to(device).eval()
+    print(f"Gen_VAE_Samples: Loading model {model_name} from {checkpoint_dir}, using device {device}", flush=True)
+    m1 = torch.load(f"{checkpoint_dir}/{model_name}_e19.pt", map_location=device)
+    m1.device = device # this changes the device in the model class
+    m1.to(device).eval() # this moves weights 
     date = datetime.now().date().isoformat()
-
-    output_file = f"{save_dir}/{model_name}/generations.jsonl"
-    save_dir = f"{save_dir}/{model_name}/samples/"
-    os.makedirs(save_dir, exist_ok=True)
-    batch_size = 1
+    
+    if test:
+        num_generations = 1
+        batch_size = 1
+        output_file = f"{save_dir}/{model_name}/generations_test.jsonl"
+        save_dir = f"{save_dir}/{model_name}/samples_test/"
+        os.makedirs(save_dir, exist_ok=True)
+    else: 
+        batch_size = 1
+        output_file = f"{save_dir}/{model_name}/generations.jsonl"
+        save_dir = f"{save_dir}/{model_name}/samples/"
+        os.makedirs(save_dir, exist_ok=True)
+    
+    
     print(f"Gen_VAE_Samples: Generating {num_generations} generations.", flush=True)
     # Make a dataset file to dump 
     with jsonlines.open(output_file, mode='w', flush = True) as writer:
@@ -31,20 +41,20 @@ def generate_images(model_name, num_generations, checkpoint_dir, save_dir, logge
         try: 
             # Generate images and write to files
             for i in range(num_generations):
-                if i % 10 == 0:
-                    logger.log({"Progress": i})
-                  
+                if logger is not None:
+                    if i % 10 == 0:
+                        logger.log({"Progress": i})
                 m1_samples, m1_m1_ll = m1.sample(batch_size, device) # images, log_likelihood
-                m1_samples = m1_samples.detach().cpu()
-                m1_samples = m1_m1_ll.detach().cpu()
+                if device.type == 'cuda':
+                    m1_samples = m1_samples.detach().cpu()
+                    m1_m1_ll = m1_m1_ll.detach().cpu()
 
                 for j, (sample, log_likelihood) in enumerate(zip(m1_samples, m1_m1_ll)):
                     # Save image to file 
-                    id - str(uuid.uuid4())
+                    id = str(uuid.uuid4())
                     location = os.path.join(save_dir, f"{id}.png")
                     img = to_pil_image(sample)
                     img.save(location)
-            
                     # Add a metadata entry to the jsonl file 
                     data_entry = {
                         "id": id,
@@ -57,7 +67,7 @@ def generate_images(model_name, num_generations, checkpoint_dir, save_dir, logge
                     writer.write(data_entry)
                 
         except Exception as e:
-            print(f"Gen_Model_Samples: Error: {e}", flush = True) 
+            print(f"Gen_Model_Samples: Generation Error: {e}", flush = True) 
         
     print("Completed Saving Generations")
     return 
@@ -69,6 +79,19 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected in the form of: True/False, T/F, Yes/No, Y/N, or 1/0')
+
+############## USING THIS SCRIPT ##################
+# This script relies on 
+# 1) the VAE class in models/vae.py. 
+# 2) the logger class in logger.py. You can delete the logger reliance using the LOGGING comments below and the import.  
+
+# Example use from command line:
+# python3 gen_vae_samples.py --model_name "ldim_2" --num_generations 100
+
+# Example use from slurm launcher: 
+# run_bash.py is a script that launches the slurm job using the config.yaml file and any overrides you specify. 
+# launch_playground.py has example calls to run_bash.py script. Roughly, it looks something like:
+#       'python run_bash.py --multirun command="python3 /scratch/mr7401/projects/meta_comp/generation/gen_vae_samples.py" args.model_name=vae_ldim_2 hydra.launcher.mem=1G hydra.launcher.gres=gpu:0 hydra.launcher.time=10 logging.experiment=generate_vae_samples'
 
 if __name__ == "__main__":
 
@@ -82,12 +105,13 @@ if __name__ == "__main__":
 
     args, unknown_args = parser.parse_known_args()
   
-    # Set up logging
+    # LOGGING Set up logging. Can delete this and pass logger = None if you don't want to use the logger class.
     logging_name = f"{args.model_name}_num{args.num_generations}"
-    logger = Logger(group = "Generate_VAE_Samples_GPU", logging_name=logging_name, **vars(args))
-    os.makedirs(f"{args.data_dir}/{args.model_name}", exist_ok = True)
-   
-    # Set up the output saving
+    logger = Logger(group = "Generate_VAE_Samples", logging_name=logging_name, **vars(args))
+    # LOGGING Uncomment this line to disable progress logging in wandb. Slurm will still capture the output and any errors / print outs. 
+    # logger = None 
+
+    # Call function 
     generate_images(model_name = args.model_name, num_generations = args.num_generations, checkpoint_dir = args.checkpoint_dir, save_dir= args.save_dir, logger = logger, test=args.test)
     print(f"Gen_VAE_Samples: Generated {args.num_generations} sequences using model {args.model_name} and saved in {args.save_dir}", flush = True)
     

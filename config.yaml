@@ -6,12 +6,14 @@ args:
   ldim: ~
   model_name: ~
   model_name2: ~
-  num_sequences: ~
+  num_generations: ~
   max_length: ~
   test: False # If True, models are loaded but no generation is made. 
-  data_dir: ~ # overwrite default saving directory 
+  data_dir: ~ # used by the LLM generation to identify where to save generated text
+  save_dir: ~ # used by VAE generation to identify where to save generated images. #TODO: Align these scripts
+  checkpoint_dir: ~ # overwrite default weight loading directory
   use_local_weights: False # If True and we have a local path for the model, local weights will be used. 
-  n_subset: ~
+  n_subset: ~ 
 
 command: ~
 tags: ~
