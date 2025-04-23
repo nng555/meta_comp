@@ -65,7 +65,7 @@ class Model:
 
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True, padding=True)
     
-    def calculate_perplexity(self, text, device="cpu", verbose=False, context_window_limit=None, stride_denominator=2):
+    def calculate_perplexity(self, text, verbose=False, context_window_limit=None, stride_denominator=2):
         """
         Purpose: Calculate the perplexity of a given text using the model.
         ## Source: adapted from https://huggingface.co/docs/transformers/perplexity 
@@ -89,7 +89,7 @@ class Model:
         for begin_loc in range(0, seq_len, stride):
             end_loc = min(begin_loc + max_length, seq_len)
             trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
-            input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
+            input_ids = encodings.input_ids[:, begin_loc:end_loc].to(self.device)
             target_ids = input_ids.clone().to(self.device)
             target_ids[:, :-trg_len] = -100
 

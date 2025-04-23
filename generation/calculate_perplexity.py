@@ -2,8 +2,8 @@ import argparse
 import uuid
 import jsonlines
 import os
-# os.sys.path.append('/scratch/mr7401/projects/meta_comp/')
-os.sys.path.append('/Users/mr7401/Projects/meta_comp/')
+os.sys.path.append('/scratch/mr7401/projects/meta_comp/')
+#os.sys.path.append('/Users/mr7401/Projects/meta_comp/')
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 os.environ["TORCH_USE_CUDA_DSA"] = "1"
 from logger import Logger, add_log_args
@@ -74,7 +74,7 @@ def calculate_perplexity(model_name, output_file, use_local_weights, logger, tes
             def __getitem__(self, idx):
                 return {"id": self.ids[idx], "sequence": self.data[idx]}
             
-        dataset = NYTArticlesDataset(csv_file="nyt_articles_with_text.csv", n_subset=n_subset)
+        dataset = NYTArticlesDataset(csv_file="/scratch/mr7401/projects/meta_comp/nyt_articles_with_text.csv", n_subset=n_subset)
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
         
         total_complete = 0
@@ -95,6 +95,8 @@ def calculate_perplexity(model_name, output_file, use_local_weights, logger, tes
                     for i in range(len(batch["sequence"])):
                         if i < len(batch["id"]):
                             total_complete += 1
+                            if total_complete % 10 == 0:
+                                print(f"Total complete: {total_complete}", flush=True)
                             data_entry = {
                                 "generation_id": batch["id"][i],
                                 # "generation": batch["sequence"][i],

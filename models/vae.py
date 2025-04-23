@@ -18,10 +18,12 @@ class VAE(nn.Module):
                  in_channels,
                  latent_dim,
                  hidden_dims=None,
+                 device='cpu',
                  **kwargs):
         super(VAE, self).__init__()
 
         self.latent_dim = latent_dim
+        self.device = device
 
         modules = []
         if hidden_dims is None:
@@ -32,17 +34,17 @@ class VAE(nn.Module):
             modules.append(
                 nn.Sequential(
                     nn.Conv2d(in_channels, out_channels=h_dim,
-                              kernel_size= 3, stride= 2, padding  = 1),
+                              kernel_size=3, stride=2, padding=1),
                     nn.BatchNorm2d(h_dim),
                     nn.LeakyReLU())
             )
             in_channels = h_dim
 
-        self.encoder = nn.Sequential(*modules)
-        out = self.encoder(torch.rand(1, 3, IMAGE_SIZE, IMAGE_SIZE))
+        self.encoder = nn.Sequential(*modules).to(self.device)
+        out = self.encoder(torch.rand(1, 3, IMAGE_SIZE, IMAGE_SIZE).to(self.device))
         self.size = out.shape[2]
-        self.fc_mu = nn.Linear(hidden_dims[-1] * self.size * self.size, latent_dim)
-        self.fc_var = nn.Linear(hidden_dims[-1] * self.size * self.size, latent_dim)
+        self.fc_mu = nn.Linear(hidden_dims[-1] * self.size * self.size, latent_dim).to(self.device)
+        self.fc_var = nn.Linear(hidden_dims[-1] * self.size * self.size, latent_dim).to(self.device)
 
         modules = []
         self.decoder_input = nn.Linear(latent_dim, hidden_dims[-1] * self.size * self.size)
@@ -61,7 +63,7 @@ class VAE(nn.Module):
                     nn.LeakyReLU())
             )
 
-        self.decoder = nn.Sequential(*modules)
+        self.decoder = nn.Sequential(*modules).to(self.device)
 
         self.final_layer = nn.Sequential(
             nn.ConvTranspose2d(hidden_dims[-1],
@@ -75,47 +77,37 @@ class VAE(nn.Module):
             nn.Conv2d(hidden_dims[-1], out_channels=3,
                       kernel_size=3, padding=1),
             nn.Sigmoid())
+    
+        self.final_layer.to(self.device)
 
     def encode(self, input):
-        """
-        Encodes the input by passing through the encoder network
-        and returns the latent codes.
-        :param input: (Tensor) Input tensor to encoder [N x C x H x W]
-        :return: (Tensor) List of latent codes
-        """
+        input = input.to(self.device)
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
 
-        # Split the result into mu and var components
-        # of the latent Gaussian distribution
         mu = self.fc_mu(result)
         log_var = self.fc_var(result)
 
         return [mu, log_var]
 
     def decode(self, z):
-        """
-        Maps the given latent codes
-        onto the image space.
-        :param z: (Tensor) [B x D]
-        :return: (Tensor) [B x C x H x W]
-        """
+        z = z.to(self.device)
         result = self.decoder_input(z)
         result = result.view(-1, 512, self.size, self.size)
         result = self.decoder(result)
         result = self.final_layer(result)
         result = decode_transform(result)
-        #result = torch.flatten(result, start_dim=1)
         result = torch.nan_to_num(result)
         return result
 
     def log_likelihood(self, x, n_samples=1000):
+        x = x.to(self.device)
         bsize = x.shape[0]
         imsize = np.prod(x.shape[1:])
 
         with torch.no_grad():
             mu, log_var = self.encode(x)
-            log_weights = torch.zeros(bsize, n_samples).cuda()
+            log_weights = torch.zeros(bsize, n_samples).to(self.device)
 
             for k in range(n_samples):
                 z = self.reparameterize(mu, log_var)
@@ -126,11 +118,7 @@ class VAE(nn.Module):
 
                 decoded = self.decode(z)
 
-                # assume normal distribution since we trained with MSE loss on reconstruction
                 log_px_z = -((x.view(bsize, -1) - decoded.view(bsize, -1))**2).sum(-1)
-                # these are constants for all images
-                    #- np.log(sigma) * imsize
-                    #- 0.5 * np.log(2 * np.pi) * imsize
 
                 log_weights[:, k] = log_px_z + log_pz - log_qz_x
 
@@ -144,45 +132,32 @@ class VAE(nn.Module):
 
         return log_likelihood
 
-
     def reparameterize(self, mu, logvar):
-        """
-        Reparameterization trick to sample from N(mu, var) from
-        N(0,1).
-        :param mu: (Tensor) Mean of the latent Gaussian [B x D]
-        :param logvar: (Tensor) Standard deviation of the latent Gaussian [B x D]
-        :return: (Tensor) [B x D]
-        """
+        mu = mu.to(self.device)
+        logvar = logvar.to(self.device)
         std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
+        eps = torch.randn_like(std).to(self.device)
         return eps * std + mu
 
     def forward(self, input, **kwargs):
+        input = input.to(self.device)
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
-        return  [self.decode(z), input, mu, log_var]
+        return [self.decode(z), input, mu, log_var]
 
     def loss_function(self,
                       *args,
                       **kwargs):
-        """
-        Computes the VAE loss function.
-        KL(N(\mu, \sigma), N(0, 1)) = \log \frac{1}{\sigma} + \frac{\sigma^2 + \mu^2}{2} - \frac{1}{2}
-        :param args:
-        :param kwargs:
-        :return:
-        """
-        recons = args[0]
-        input = args[1]
-        mu = args[2]
-        log_var = args[3]
+        recons = args[0].to(self.device)
+        input = args[1].to(self.device)
+        mu = args[2].to(self.device)
+        log_var = args[3].to(self.device)
 
         bsize = input.shape[0]
 
-        kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
+        kld_weight = kwargs['M_N']
         recons_loss = F.mse_loss(recons.view(bsize, -1), input.view(bsize, -1))
 
-        #kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
         kld_loss = -0.5 * torch.mean(1 + log_var - mu ** 2 - log_var.exp())
 
         loss = recons_loss + kld_weight * kld_loss
@@ -191,17 +166,8 @@ class VAE(nn.Module):
     def sample(self,
                num_samples,
                current_device):
-        """
-        Samples from the latent space and return the corresponding
-        image space map.
-        :param num_samples: (Int) Number of samples
-        :param current_device: (Int) Device to run the model
-        :return: (Tensor)
-        """
         z = torch.randn(num_samples,
-                        self.latent_dim)
-
-        z = z.to(current_device)
+                        self.latent_dim).to(self.device)
 
         log_z = Normal(
             torch.zeros_like(z),
@@ -213,35 +179,8 @@ class VAE(nn.Module):
             min=0., max=1.,
         )
 
-        """
-        noise = torch.normal(
-            mean=torch.zeros_like(sample_means),
-            std=torch.ones_like(sample_means) * np.sqrt(0.5),
-        )
-
-        samples = torch.clamp(
-            sample_means + noise,
-            min=0, max=1,
-        )
-        """
-
-        """
-        log_x_z = Normal(
-            torch.zeros_like(noise),
-            torch.ones_like(noise) * np.sqrt(0.5)
-        ).log_prob(noise).sum([-1, -2, -3])
-
-        samples = sample_means + noise
-        likelihoods = log_z + log_x_z
-        """
-
         return sample_means, log_z
 
     def generate(self, x, **kwargs):
-        """
-        Given an input image x, returns the reconstructed image
-        :param x: (Tensor) [B x C x H x W]
-        :return: (Tensor) [B x C x H x W]
-        """
-
+        x = x.to(self.device)
         return self.forward(x)[0]
