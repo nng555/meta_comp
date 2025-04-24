@@ -59,6 +59,8 @@ def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_sam
             print(y.cpu().numpy())
         #print(np.mean(losses))
 
+    torch.save(model, 'st5_4l.ckpt')
+
 if __name__ == "__main__":
 
     max_samples = 30
@@ -67,7 +69,7 @@ if __name__ == "__main__":
     model = SetTransformer5(
         n_inputs=64,
         n_outputs=1,
-        n_enc_layers=3,
+        n_enc_layers=4,
         dim_hidden=128,
         norm='set_norml',
         sample_size=max_samples,

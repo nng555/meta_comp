@@ -8,14 +8,10 @@ from torch.distributions import Normal
 
 IMAGE_SIZE = 28
 
-decode_transform = transforms.Compose([
-    transforms.Resize(IMAGE_SIZE, antialias=True),
-    transforms.CenterCrop(IMAGE_SIZE)])  # used by decode method to transform final output
-
 class VAE(nn.Module):
 
     def __init__(self,
-                 in_channels,
+                 in_dim,
                  latent_dim,
                  hidden_dims=None,
                  **kwargs):
@@ -25,56 +21,38 @@ class VAE(nn.Module):
 
         modules = []
         if hidden_dims is None:
-            hidden_dims = [32, 64, 128, 256, 512]
+            hidden_dims = [512, 384]
 
         # Build Encoder
+        tmp_dim = in_dim
         for h_dim in hidden_dims:
             modules.append(
                 nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels=h_dim,
-                              kernel_size= 3, stride= 2, padding  = 1),
-                    nn.BatchNorm2d(h_dim),
-                    nn.LeakyReLU())
+                    nn.Linear(tmp_dim, h_dim),
+                    nn.ReLU())
             )
-            in_channels = h_dim
+            tmp_dim = h_dim
 
         self.encoder = nn.Sequential(*modules)
-        out = self.encoder(torch.rand(1, 3, IMAGE_SIZE, IMAGE_SIZE))
-        self.size = out.shape[2]
-        self.fc_mu = nn.Linear(hidden_dims[-1] * self.size * self.size, latent_dim)
-        self.fc_var = nn.Linear(hidden_dims[-1] * self.size * self.size, latent_dim)
+        self.fc_mu = nn.Linear(hidden_dims[-1], latent_dim)
+        self.fc_var = nn.Linear(hidden_dims[-1], latent_dim)
 
         modules = []
-        self.decoder_input = nn.Linear(latent_dim, hidden_dims[-1] * self.size * self.size)
         hidden_dims.reverse()
+        tmp_dim = latent_dim
 
-        for i in range(len(hidden_dims) - 1):
+        for h_dim in hidden_dims + [in_dim]:
             modules.append(
                 nn.Sequential(
-                    nn.ConvTranspose2d(hidden_dims[i],
-                                       hidden_dims[i + 1],
-                                       kernel_size=3,
-                                       stride=2,
-                                       padding=1,
-                                       output_padding=1),
-                    nn.BatchNorm2d(hidden_dims[i + 1]),
-                    nn.LeakyReLU())
+                    nn.Linear(tmp_dim, h_dim),
+                    nn.ReLU())
             )
+            tmp_dim = h_dim
+
+        # clamp to 0-1 pixel values
+        modules.append(nn.Sigmoid())
 
         self.decoder = nn.Sequential(*modules)
-
-        self.final_layer = nn.Sequential(
-            nn.ConvTranspose2d(hidden_dims[-1],
-                               hidden_dims[-1],
-                               kernel_size=3,
-                               stride=2,
-                               padding=1,
-                               output_padding=1),
-            nn.BatchNorm2d(hidden_dims[-1]),
-            nn.LeakyReLU(),
-            nn.Conv2d(hidden_dims[-1], out_channels=3,
-                      kernel_size=3, padding=1),
-            nn.Sigmoid())
 
     def encode(self, input):
         """
@@ -100,18 +78,12 @@ class VAE(nn.Module):
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        result = self.decoder_input(z)
-        result = result.view(-1, 512, self.size, self.size)
-        result = self.decoder(result)
-        result = self.final_layer(result)
-        result = decode_transform(result)
-        #result = torch.flatten(result, start_dim=1)
+        result = self.decoder(z)
         result = torch.nan_to_num(result)
         return result
 
     def log_likelihood(self, x, n_samples=1000):
         bsize = x.shape[0]
-        imsize = np.prod(x.shape[1:])
 
         with torch.no_grad():
             mu, log_var = self.encode(x)
@@ -126,12 +98,11 @@ class VAE(nn.Module):
 
                 decoded = self.decode(z)
 
-                # assume normal distribution since we trained with MSE loss on reconstruction
-                log_px_z = -((x.view(bsize, -1) - decoded.view(bsize, -1))**2).sum(-1)
-                # these are constants for all images
-                    #- np.log(sigma) * imsize
-                    #- 0.5 * np.log(2 * np.pi) * imsize
+                # use bernoulli distribution log likelihood calculation
+                log_px_Z = F.binary_cross_entropy(decoded, x, reduction='none').sum(-1)
+                #log_px_z = -((x - decoded)**2).sum(-1)
 
+                # importance sampling
                 log_weights[:, k] = log_px_z + log_pz - log_qz_x
 
         max_log_weights = torch.max(log_weights, dim=1, keepdim=True)[0]
@@ -172,21 +143,21 @@ class VAE(nn.Module):
         :param kwargs:
         :return:
         """
+
         recons = args[0]
         input = args[1]
         mu = args[2]
         log_var = args[3]
-
         bsize = input.shape[0]
 
         kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
-        recons_loss = F.mse_loss(recons.view(bsize, -1), input.view(bsize, -1))
+        recons_loss = F.binary_cross_entropy(recons, input)
 
         #kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
         kld_loss = -0.5 * torch.mean(1 + log_var - mu ** 2 - log_var.exp())
 
         loss = recons_loss + kld_weight * kld_loss
-        return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach()}
+        return {'loss': loss, 'recon_loss': recons_loss.detach(), 'kld': -kld_loss.detach()}
 
     def sample(self,
                num_samples,
@@ -203,39 +174,13 @@ class VAE(nn.Module):
 
         z = z.to(current_device)
 
-        log_z = Normal(
-            torch.zeros_like(z),
-            torch.ones_like(z)
-        ).log_prob(z).sum(-1)
-
         sample_means = torch.clamp(
             self.decode(z),
             min=0., max=1.,
         )
+        samples = torch.bernoulli(sample_means)
 
-        """
-        noise = torch.normal(
-            mean=torch.zeros_like(sample_means),
-            std=torch.ones_like(sample_means) * np.sqrt(0.5),
-        )
-
-        samples = torch.clamp(
-            sample_means + noise,
-            min=0, max=1,
-        )
-        """
-
-        """
-        log_x_z = Normal(
-            torch.zeros_like(noise),
-            torch.ones_like(noise) * np.sqrt(0.5)
-        ).log_prob(noise).sum([-1, -2, -3])
-
-        samples = sample_means + noise
-        likelihoods = log_z + log_x_z
-        """
-
-        return sample_means, log_z
+        return samples
 
     def generate(self, x, **kwargs):
         """
