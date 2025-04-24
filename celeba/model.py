@@ -167,13 +167,10 @@ class VAE(nn.Module):
                num_samples,
                current_device):
         z = torch.randn(num_samples,
-<<<<<<<< HEAD:models/vae.py
+
                         self.latent_dim).to(self.device)
-========
-                        self.latent_dim)
 
         z = z.to(current_device)
->>>>>>>> main:celeba/model.py
 
         log_z = Normal(
             torch.zeros_like(z),
@@ -183,15 +180,12 @@ class VAE(nn.Module):
         sample_means = torch.clamp(
             self.decode(z),
             min=0., max=1.,
-<<<<<<<< HEAD:models/vae.py
-========
         )
-
-        """
+    
         noise = torch.normal(
             mean=torch.zeros_like(sample_means),
             std=torch.ones_like(sample_means) * np.sqrt(0.5),
->>>>>>>> main:celeba/model.py
+
         )
 
         return sample_means, log_z

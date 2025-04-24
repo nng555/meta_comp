@@ -31,42 +31,25 @@ def collator(batch):
 
 @app.command()
 def train(
-<<<<<<<< HEAD:meta_models/train.py
-        nepochs: int=20,
-        latent_dim: int=128,
-        bsize: int=16,
-        lr: float=1e-3,
-        test = False
-========
     nepochs: int=15,
     latent_dim: int=128,
     bsize: int=16,
     lr: float=1e-3,
->>>>>>>> main:mnist/train.py
 ):
 
     # Check for device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Training configuration: nepochs={nepochs}, latent_dim={latent_dim}, bsize={bsize}, lr={lr}, test={test}")
+    print(f"Training configuration: nepochs={nepochs}, latent_dim={latent_dim}, bsize={bsize}, lr={lr}")
     # load dataset
-<<<<<<<< HEAD:meta_models/train.py
-    # if test == "True":
-    #     print("WARNING: USING 100 Sample in Test Mode!!!", flush = True)
-    #     data = load_dataset('nielsr/CelebA-faces', split="train[:100]")
-    # else:
-    #     data = load_dataset('nielsr/CelebA-faces', split="train")
-    # data = load_dataset('nielsr/CelebA-faces', split="train[:100]")
+
     data = load_dataset('nielsr/CelebA-faces', split="train")
     data = data.train_test_split(test_size=0.01, seed = 42)
-========
-    data = load_dataset('nielsr/CelebA-faces', split='train')
-    data = data.train_test_split(test_size=0.01)
->>>>>>>> main:mnist/train.py
 
     # set transforms
     def celeb_t(examples):
         examples['image'] = [celeb_transform(image) for image in examples['image']]
         return examples
+    
     data.set_transform(celeb_t) # 150 x 150 x 3
 
     # load model
