@@ -10,6 +10,11 @@ recon/
 __pycache__/
 *.py[cod]
 *$py.class
+playground.*
+launch_playground.sh
+slurm_outputs/
+model_weights/
+
 
 # C extensions
 *.so
