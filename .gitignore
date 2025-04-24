@@ -1,3 +1,8 @@
+# extras
+*.pkl
+wandb/
+data/
+
 # Byte-compiled / optimized / DLL files
 checkpoints/
 kl_diffs/

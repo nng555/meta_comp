@@ -25,6 +25,9 @@ logging:
   experiment: ~
   run_name: ${oc.select:hydra.launcher.date,${now:%%m-%d-%%I%p}}
   log_dir: /scratch/mr7401/logs/${logging.project}
+m1: ~
+m2: ~
+test: ~
 
 hydra:
   launcher:
@@ -32,13 +35,14 @@ hydra:
     mem: 1G
     gres: gpu:1
     container: singularity
-    singularity_img: /scratch/work/public/singularity/cuda12.1.1-cudnn8.9.0-devel-ubuntu22.04.2.sif
-    singularity_overlay: /scratch/mr7401/projects/pytorch-example/overlay-50G-10M.ext3 
+    singularity_img: /scratch/work/public/singularity/cuda12.1.1-cudnn8.9.0-devel-ubuntu22.04.2.sif # /scratch/work/public/singularity/cuda11.6.124-cudnn8.4.0.27-devel-ubuntu20.04.4.sif
+    singularity_overlay: /scratch/mr7401/projects/pytorch-example/overlay-50G-10M.ext3 #/scratch/nhn234/singularity/lookahead.ext3
     env_type: conda
-    env_name: test
+    env_name: test #unsloth_env
     time: 240
     job_name: ${logging.experiment}
     #partition: ~ #a100_1,a100_2
+
 ##### SUGGESTED HYDRA CONFIG ###########################
   sweep: 
     # subdir is built dynamically using the tags

@@ -1,5 +1,3 @@
-import sys
-sys.path.append("/scratch/mr7401/projects/meta_comp")
 from datasets import load_dataset
 from collections import defaultdict
 from torchvision.utils import save_image
@@ -7,13 +5,11 @@ from tqdm import tqdm
 import torchvision.transforms as transforms
 import torch
 from torch.utils.data import DataLoader
-from models.vae import VAE
+from model import VAE
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ConstantLR, LinearLR, SequentialLR
-import os
 
 import typer
-import pandas as pd
 app = typer.Typer()
 
 IMAGE_SIZE=150
@@ -31,37 +27,15 @@ def collator(batch):
 
 @app.command()
 def train(
-<<<<<<<< HEAD:meta_models/train.py
-        nepochs: int=20,
-        latent_dim: int=128,
-        bsize: int=16,
-        lr: float=1e-3,
-        test = False
-========
     nepochs: int=15,
     latent_dim: int=128,
     bsize: int=16,
     lr: float=1e-3,
->>>>>>>> main:mnist/train.py
 ):
 
-    # Check for device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Training configuration: nepochs={nepochs}, latent_dim={latent_dim}, bsize={bsize}, lr={lr}, test={test}")
     # load dataset
-<<<<<<<< HEAD:meta_models/train.py
-    # if test == "True":
-    #     print("WARNING: USING 100 Sample in Test Mode!!!", flush = True)
-    #     data = load_dataset('nielsr/CelebA-faces', split="train[:100]")
-    # else:
-    #     data = load_dataset('nielsr/CelebA-faces', split="train")
-    # data = load_dataset('nielsr/CelebA-faces', split="train[:100]")
-    data = load_dataset('nielsr/CelebA-faces', split="train")
-    data = data.train_test_split(test_size=0.01, seed = 42)
-========
     data = load_dataset('nielsr/CelebA-faces', split='train')
     data = data.train_test_split(test_size=0.01)
->>>>>>>> main:mnist/train.py
 
     # set transforms
     def celeb_t(examples):
@@ -73,9 +47,8 @@ def train(
     model = VAE(
         in_channels=3,
         latent_dim=latent_dim, # maybe select them some other way?
-        device=device,
     )
-    model.to(device)
+    model.cuda()
 
     batch_per_epoch = int(len(data['train']) / bsize)
 
@@ -94,14 +67,13 @@ def train(
     )
     optim.zero_grad()
 
-    loss_averages = []
     # train
     for epoch in range(nepochs):
         epoch_loss = defaultdict(float)
         batch_loss = defaultdict(float)
 
         for i, batch in tqdm(enumerate(loader), total=batch_per_epoch):
-            out = model(batch['image'].to(device))
+            out = model(batch['image'].cuda())
             out[-1] = torch.clamp_(out[-1], -10, 10)
             loss = model.loss_function(*out, M_N=0.00025)
             loss['loss'].backward()
@@ -120,37 +92,26 @@ def train(
                 print(res_str, flush=True)
                 batch_loss = defaultdict(float)
 
-     
         print(f"Epoch {epoch + 1}/{nepochs}: loss {epoch_loss['loss'] / batch_per_epoch}")
 
-        print(f"Epoch {epoch + 1}/{nepochs}: loss {epoch_loss['loss'] / batch_per_epoch}")
-        # Save epoch loss average to a pandas DataFrame
-        if epoch == 0:
-            loss_df = pd.DataFrame(columns=['epoch', 'loss_avg'])
-
-        loss_averages.append(epoch_loss['loss'] / batch_per_epoch)
-      
         # TODO: don't hardcode this
-        torch.save(model, f'/scratch/mr7401/projects/meta_comp/checkpoints/vae_ldim_{latent_dim}_e{epoch}.pt')
+        torch.save(model, f'/home/nhn234/projects/diff_regret/checkpoints/vae_ldim_{latent_dim}_e{epoch}.pt')
 
         model.eval()
         test_loss = 0
         with torch.no_grad():
             for i, batch in enumerate(test_loader):
-                out = model(batch['image'].to(device))
+                out = model(batch['image'].cuda())
                 test_loss += model.loss_function(*out, M_N=0.00025)['loss'].item()
                 if i == 0:
                     n = min(batch['image'].size(0), 8)
                     comparison = torch.cat([batch['image'][:n],
                             out[0].view(batch['image'].shape)[:n].cpu()])
-                    os.makedirs(f'/scratch/mr7401/projects/meta_comp/recon/recon_ldim_{latent_dim}', exist_ok=True)
                     save_image(comparison.cpu(),
-                               f'/scratch/mr7401/projects/meta_comp/recon/recon_ldim_{latent_dim}/e{str(epoch)}.png', nrow=n)
+                               f'/home/nhn234/projects/diff_regret/recon/recon_ldim_{latent_dim}_e{str(epoch)}.png', nrow=n)
 
         test_loss /= len(test_loader.dataset)
         print('====> Test set loss: {:.4f}'.format(test_loss))
-    loss_df = pd.DataFrame({'epoch': range(nepochs), 'loss_avg': loss_averages})
-    loss_df.to_csv(f'/scratch/mr7401/projects/meta_comp/checkpoints/vae_ldim_{latent_dim}_losses.csv', index=False)
 
 if __name__ == "__main__":
     app()
