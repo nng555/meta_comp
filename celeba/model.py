@@ -156,12 +156,13 @@ class VAE(nn.Module):
         bsize = input.shape[0]
 
         kld_weight = kwargs['M_N']
-        recons_loss = F.mse_loss(recons.view(bsize, -1), input.view(bsize, -1))
+        recons_loss = F.mse_loss(recons, input, reduction='sum') / bsize
 
-        kld_loss = -0.5 * torch.mean(1 + log_var - mu ** 2 - log_var.exp())
+        kld_loss = -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp()) / bsize
 
         loss = recons_loss + kld_weight * kld_loss
-        return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach()}
+        return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach(),  'KLD_Scaled': kld_weight*(-kld_loss.detach())}
+
 
     def sample(self,
                num_samples,

@@ -26,7 +26,7 @@ def calculate_log_likelihood(model_name, output_file, logger, test = False, verb
     # Load Model 
     model1 = torch.load(f"/scratch/mr7401/projects/meta_comp/checkpoints/{model_name}_e19.pt", map_location=device)
     model1.device = device # this changes the device in the model class
-    model1.to(device).eval() # this moves weights 
+    model1.to(device).eval() # this smoves weight 
     print(f"Calculate_Log_Likelihood: Opening output file and starting to load generation datasets...", flush = True)
     with jsonlines.open(output_file, mode='a', flush = True) as writer:
         
