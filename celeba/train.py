@@ -36,10 +36,13 @@ def train(
 ):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}", flush=True)
     # load dataset
     data = load_dataset('nielsr/CelebA-faces', split='train')
     data = data.train_test_split(test_size=0.01)
-    M_N = 2
+    
+    M_N = 1
+    print(f"Training with M_N = {M_N}", flush = True)
     # set transforms
     def celeb_t(examples):
         examples['image'] = [celeb_transform(image) for image in examples['image']]
@@ -94,7 +97,7 @@ def train(
                 epoch_loss[k] += l.item()
                 batch_loss[k] += l.item()
 
-            if (i + 1) % 10 == 2:
+            if (i + 1) % 10 == 10000:
                 res_str = f"Iter {i+1}/{batch_per_epoch}: ({scheduler.get_last_lr()[0]:.4f})"
                 for k, l in batch_loss.items():
                     res_str += f" {k}: {l / 1000:.4f}"
