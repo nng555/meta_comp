@@ -56,6 +56,7 @@ def train(
 
     # Check for device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # load dataset
     data = load_dataset('ylecun/mnist', split='train')
     data = data.train_test_split(test_size=0.01)
@@ -64,6 +65,7 @@ def train(
     def mnist_t(examples):
         examples['image'] = [mnist_transform(image) for image in examples['image']]
         return examples
+
     data.set_transform(mnist_t) # 784 flat
 
     # load model

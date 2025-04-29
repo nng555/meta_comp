@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 from model import VAE
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ConstantLR, LinearLR, SequentialLR
+import os 
+import pandas as pd 
 
 import typer
 app = typer.Typer()
@@ -27,16 +29,17 @@ def collator(batch):
 
 @app.command()
 def train(
-    nepochs: int=15,
+    nepochs: int=30,
     latent_dim: int=128,
     bsize: int=16,
     lr: float=1e-3,
 ):
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # load dataset
     data = load_dataset('nielsr/CelebA-faces', split='train')
     data = data.train_test_split(test_size=0.01)
-
+    M_N = 2
     # set transforms
     def celeb_t(examples):
         examples['image'] = [celeb_transform(image) for image in examples['image']]
@@ -47,8 +50,10 @@ def train(
     model = VAE(
         in_channels=3,
         latent_dim=latent_dim, # maybe select them some other way?
+        device = device, 
+        
     )
-    model.cuda()
+    model.to(device)
 
     batch_per_epoch = int(len(data['train']) / bsize)
 
@@ -68,14 +73,18 @@ def train(
     optim.zero_grad()
 
     # train
+    loss_averages = []
+    recon_losses = []
+    kld_losses = []
+    kld_scaled_losses = []
     for epoch in range(nepochs):
         epoch_loss = defaultdict(float)
         batch_loss = defaultdict(float)
 
         for i, batch in tqdm(enumerate(loader), total=batch_per_epoch):
-            out = model(batch['image'].cuda())
+            out = model(batch['image'].to(device))
             out[-1] = torch.clamp_(out[-1], -10, 10)
-            loss = model.loss_function(*out, M_N=0.00025)
+            loss = model.loss_function(*out, M_N = M_N)
             loss['loss'].backward()
             optim.step()
             optim.zero_grad()
@@ -85,33 +94,58 @@ def train(
                 epoch_loss[k] += l.item()
                 batch_loss[k] += l.item()
 
-            if (i + 1) % 1000 == 0:
+            if (i + 1) % 10 == 2:
                 res_str = f"Iter {i+1}/{batch_per_epoch}: ({scheduler.get_last_lr()[0]:.4f})"
                 for k, l in batch_loss.items():
                     res_str += f" {k}: {l / 1000:.4f}"
                 print(res_str, flush=True)
                 batch_loss = defaultdict(float)
-
-        print(f"Epoch {epoch + 1}/{nepochs}: loss {epoch_loss['loss'] / batch_per_epoch}")
+        
+        loss_averages.append(epoch_loss['loss'] / batch_per_epoch)
+        recon_losses.append(epoch_loss['Reconstruction_Loss'] / batch_per_epoch)
+        kld_losses.append(epoch_loss['KLD'] / batch_per_epoch)
+        kld_scaled_losses.append(epoch_loss['KLD_Scaled'] / batch_per_epoch)
+        print(f"Epoch {epoch + 1}/{nepochs}:")
+        print(f"  Total Loss: {epoch_loss['loss'] / batch_per_epoch:.4f}")
+        print(f"  KLD Loss: {epoch_loss['KLD'] / batch_per_epoch:.4f}")
+        print(f"  KLD Loss Scaled: {epoch_loss['KLD_Scaled'] / batch_per_epoch:.4f}")
+        print(f"  Reconstruction Loss: {epoch_loss['Reconstruction_Loss'] / batch_per_epoch:.4f}")
 
         # TODO: don't hardcode this
-        torch.save(model, f'/home/nhn234/projects/diff_regret/checkpoints/vae_ldim_{latent_dim}_e{epoch}.pt')
+        os.makedirs(f'/scratch/mr7401/projects/meta_comp/checkpoints_loss_checks/MN_{M_N}/', exist_ok=True)
+        os.makedirs(f'/scratch/mr7401/projects/meta_comp/recons_loss_checks/MN_{M_N}', exist_ok=True)
+        torch.save(model, f'/scratch/mr7401/projects/meta_comp/checkpoints_loss_checks/MN_{M_N}/vae_ldim_{latent_dim}_e{epoch}.pt')
 
         model.eval()
         test_loss = 0
         with torch.no_grad():
             for i, batch in enumerate(test_loader):
-                out = model(batch['image'].cuda())
+                out = model(batch['image'].to(device))
                 test_loss += model.loss_function(*out, M_N=0.00025)['loss'].item()
                 if i == 0:
                     n = min(batch['image'].size(0), 8)
-                    comparison = torch.cat([batch['image'][:n],
-                            out[0].view(batch['image'].shape)[:n].cpu()])
-                    save_image(comparison.cpu(),
-                               f'/home/nhn234/projects/diff_regret/recon/recon_ldim_{latent_dim}_e{str(epoch)}.png', nrow=n)
+                    if device != "cpu":
+                        comparison = torch.cat([batch['image'][:n],
+                                out[0].view(batch['image'].shape)[:n].cpu()])
+                        save_image(comparison.cpu(),
+                                f'/scratch/mr7401/projects/meta_comp/recons_loss_checks/MN_{M_N}/ldim_{latent_dim}_e{str(epoch)}.png', nrow=n)
+                    else: 
+                        comparison = torch.cat([batch['image'][:n],
+                                out[0].view(batch['image'].shape)[:n]])
+                        save_image(comparison,
+                                f'/scratch/mr7401/projects/meta_comp/recons_loss_checks/MN_{M_N}/ldim_{latent_dim}_e{str(epoch)}.png', nrow=n)
 
         test_loss /= len(test_loader.dataset)
         print('====> Test set loss: {:.4f}'.format(test_loss))
+    
+    loss_df = pd.DataFrame({
+        'epoch': range(nepochs),
+        'loss_avg': loss_averages,
+        'recon_loss': recon_losses,
+        'kld_loss': kld_losses,
+        'kld_scaled_loss': kld_scaled_losses
+    })
+    loss_df.to_csv(f'/scratch/mr7401/projects/meta_comp/checkpoints_loss_checks/MN_{M_N}/vae_ldim_{latent_dim}_losses.csv', index=False)
 
 if __name__ == "__main__":
     app()
