@@ -21,7 +21,7 @@ class VAE(nn.Module):
 
         modules = []
         if hidden_dims is None:
-            hidden_dims = [512, 384]
+            hidden_dims = [512]
 
         # Build Encoder
         tmp_dim = in_dim
@@ -29,7 +29,8 @@ class VAE(nn.Module):
             modules.append(
                 nn.Sequential(
                     nn.Linear(tmp_dim, h_dim),
-                    nn.ReLU())
+                    nn.LeakyReLU(0.2)
+                )
             )
             tmp_dim = h_dim
 
@@ -41,13 +42,16 @@ class VAE(nn.Module):
         hidden_dims.reverse()
         tmp_dim = latent_dim
 
-        for h_dim in hidden_dims + [in_dim]:
+        for h_dim in hidden_dims:
             modules.append(
                 nn.Sequential(
                     nn.Linear(tmp_dim, h_dim),
-                    nn.ReLU())
+                    nn.LeakyReLU(0.2)
+                )
             )
             tmp_dim = h_dim
+
+        modules.append(nn.Linear(tmp_dim, in_dim))
 
         # clamp to 0-1 pixel values
         modules.append(nn.Sigmoid())
@@ -92,15 +96,15 @@ class VAE(nn.Module):
             for k in range(n_samples):
                 z = self.reparameterize(mu, log_var)
 
-                log_qz_x = Normal(mu, torch.sqrt(torch.exp(log_var))).log_prob(z).sum(-1)
+                log_qz_x = Normal(mu, torch.exp(0.5 * log_var)).log_prob(z).sum(-1)
 
                 log_pz = Normal(0, 1).log_prob(z).sum(-1)
 
                 decoded = self.decode(z)
 
                 # use bernoulli distribution log likelihood calculation
-                log_px_Z = F.binary_cross_entropy(decoded, x, reduction='none').sum(-1)
-                #log_px_z = -((x - decoded)**2).sum(-1)
+                #log_px_Z = F.binary_cross_entropy(decoded, x, reduction='none').sum(-1)
+                log_px_z = -((x - decoded)**2).sum(-1)
 
                 # importance sampling
                 log_weights[:, k] = log_px_z + log_pz - log_qz_x
@@ -151,10 +155,11 @@ class VAE(nn.Module):
         bsize = input.shape[0]
 
         kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
-        recons_loss = F.binary_cross_entropy(recons, input)
+        #recons_loss = F.binary_cross_entropy(recons, input)
+        recons_loss = F.mse_loss(recons, input, reduction='sum') / bsize
 
         #kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
-        kld_loss = -0.5 * torch.mean(1 + log_var - mu ** 2 - log_var.exp())
+        kld_loss = -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp()) / bsize
 
         loss = recons_loss + kld_weight * kld_loss
         return {'loss': loss, 'recon_loss': recons_loss.detach(), 'kld': -kld_loss.detach()}
@@ -178,9 +183,8 @@ class VAE(nn.Module):
             self.decode(z),
             min=0., max=1.,
         )
-        samples = torch.bernoulli(sample_means)
 
-        return samples
+        return sample_means
 
     def generate(self, x, **kwargs):
         """

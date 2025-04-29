@@ -1,5 +1,6 @@
 import argparse
 from tqdm import tqdm
+from utils import *
 import uuid
 from datetime import datetime
 import jsonlines
@@ -11,6 +12,8 @@ from PIL import Image
 import torch
 from torchvision.transforms.functional import to_pil_image
 
+IMAGE_SIZE=28
+
 def generate_images(model_name: str = "ldim_2", num_generations: int = 10, checkpoint_dir: str = "/metacomp/checkpoints/", save_dir:str = "/scratch/mr7401/vae_generations/", test=False):
     if test:
         warnings.warn("\n\n\n\n******** WARNING: gen_model_samples.py is running in testing mode! This means the model is loaded, but not used for the actual generations. ********\n\n\n\n ")
@@ -18,56 +21,23 @@ def generate_images(model_name: str = "ldim_2", num_generations: int = 10, check
     # Load a model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Gen_VAE_Samples: Loading model {model_name} from {checkpoint_dir}, using device {device}", flush=True)
-    m1 = torch.load(f"{checkpoint_dir}/{model_name}_e49.pt", map_location=device)
+    m1 = torch.load(f"{checkpoint_dir}/{model_name}_e50.pt", map_location=device)
     m1.device = device # this changes the device in the model class
     m1.to(device).eval() # this moves weights
     date = datetime.now().date().isoformat()
 
-    if test:
-        num_generations = 1
-        batch_size = 1
-        output_file = f"{save_dir}/{model_name}/generations_test.jsonl"
-        save_dir = f"{save_dir}/{model_name}/samples_test/"
-        os.makedirs(save_dir, exist_ok=True)
-    else:
-        batch_size = 1
-        output_file = f"{save_dir}/{model_name}/generations.jsonl"
-        save_dir = f"{save_dir}/{model_name}/samples/"
-        os.makedirs(save_dir, exist_ok=True)
-
-
     print(f"Gen_VAE_Samples: Generating {num_generations} generations.", flush=True)
-    # Make a dataset file to dump
-    with jsonlines.open(output_file, mode='w', flush = True) as writer:
 
-        try:
-            # Generate images and write to files
-            for i in tqdm(range(num_generations)):
-                #if logger is not None:
-                #    if i % 10 == 0:
-                #        logger.log({"Progress": i})
-                m1_samples = m1.sample(batch_size, device) # images, log_likelihood
-                if device.type == 'cuda':
-                    m1_samples = m1_samples.detach().cpu()
+    # Generate images and write to files
+    batch_size = 100
+    samples = []
+    for i in tqdm(range(num_generations // batch_size)):
+        m1_samples = m1.sample(batch_size, device) # images, log_likelihood
+        samples.append(m1_samples)
 
-                for j, sample in enumerate(m1_samples):
-                    # Save image to file
-                    id = str(uuid.uuid4())
-                    location = os.path.join(save_dir, f"{id}.png")
-                    image = Image.fromarray(sample)
-                    img.save(location)
-                    # Add a metadata entry to the jsonl file
-                    data_entry = {
-                        "id": id,
-                        "location": location,
-                        "model": model_name,
-                        "date_generated": date,
-                    }
-                    # save to file
-                    writer.write(data_entry)
-
-        except Exception as e:
-            print(f"Gen_Model_Samples: Generation Error: {e}", flush = True)
+    samples = torch.concatenate(samples)
+    os.makedirs(save_dir + f'/{model_name}', exist_ok=True)
+    torch.save(samples, save_dir + f'/{model_name}/samples.pt')
 
     print("Completed Saving Generations")
     return

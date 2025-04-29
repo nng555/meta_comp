@@ -1,3 +1,5 @@
+import sys
+sys.path.append("/scratch/mr7401/projects/meta_comp")
 from datasets import load_dataset
 from collections import defaultdict
 from torchvision.utils import save_image
@@ -13,6 +15,7 @@ import os
 os.environ["HF_HOME"] = "/scratch/" + os.environ["USER"] + "/cache"
 
 import typer
+import pandas as pd
 app = typer.Typer()
 
 IMAGE_SIZE=28
@@ -22,10 +25,9 @@ mnist_transform = transforms.Compose([
     transforms.Lambda(lambda x: torch.flatten(x)),
 ])
 
-# threshold pixels to 0/1 since we assume bernoulli
 def collator(batch):
     batch = {
-        'image': torch.round(torch.stack([b['image'] for b in batch]))
+        'image': torch.stack([b['image'] for b in batch])
     }
     return batch
 
@@ -35,7 +37,7 @@ def train(
     latent_dim: int=128,
     bsize: int=64,
     lr: float=1e-3,
-    kl_weight=0.002,
+    kl_weight=1.0,
 ):
     kl_weight = float(kl_weight)
 
@@ -52,6 +54,8 @@ def train(
     )
 
 
+    # Check for device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # load dataset
     data = load_dataset('ylecun/mnist', split='train')
     data = data.train_test_split(test_size=0.01)
@@ -66,8 +70,9 @@ def train(
     model = VAE(
         in_dim=784,
         latent_dim=latent_dim, # maybe select them some other way?
+        device=device,
     )
-    model.cuda()
+    model.to(device)
 
     batch_per_epoch = int(len(data['train']) / bsize)
     test_batch_per_epoch = int(len(data['test']) / bsize)
@@ -88,12 +93,13 @@ def train(
     )
     optim.zero_grad()
 
+    loss_averages = []
     # train
     for epoch in range(nepochs):
         epoch_loss = defaultdict(float)
 
         for i, batch in tqdm(enumerate(loader), total=batch_per_epoch):
-            out = model(batch['image'].cuda())
+            out = model(batch['image'].to(device))
             out[-1] = torch.clamp_(out[-1], -10, 10)
             loss = model.loss_function(*out, M_N=kl_weight)
             loss['loss'].backward()
@@ -104,13 +110,12 @@ def train(
             for k, l in loss.items():
                 epoch_loss[k] += l.item() * len(batch['image'])
 
-            #logs = {k: v.item() for k, v in loss.items()}
-            #logs['lr'] = scheduler.get_last_lr()[0]
-            #wandb.log(logs)
+            epoch_loss['mu'] += torch.abs(out[-2]).mean()
+            epoch_loss['log_var'] += out[-1].mean()
 
         # TODO: don't hardcode this
         if (epoch + 1) % 10 == 0:
-            torch.save(model, f'/home/nhn234/projects/meta_comp/mnist/checkpoints/vae_ldim_{latent_dim}_e{epoch}.pt')
+            torch.save(model, f'/home/nhn234/projects/meta_comp/mnist/checkpoints/vae_ldim_{latent_dim}_e{epoch + 1}.pt')
 
         model.eval()
         test_loss = defaultdict(float)
@@ -120,7 +125,7 @@ def train(
                 loss = model.loss_function(*out, M_N=kl_weight)
                 for k, l in loss.items():
                     test_loss[k] += l.item() * len(batch['image'])
-                test_loss['pixel_acc'] += (torch.round(out[0]) == out[1]).float().mean().item() * len(batch['image'])
+                test_loss['pixel_acc'] += (torch.round(out[0]) == torch.round(out[1])).float().mean().item() * len(batch['image'])
 
         logs = {}
         for k, v in epoch_loss.items():

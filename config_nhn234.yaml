@@ -1,0 +1,27 @@
+defaults:
+  - override hydra/launcher: slurm
+
+command: ~
+tags: ~
+
+ldim: ~
+test: ~
+
+hydra:
+  launcher:
+    cpus_per_task: 2
+    mem: 15G
+    gres: gpu:1
+    env_type: conda
+    env_name: unsloth_env
+    container: singularity
+    singularity_img: /scratch/work/public/singularity/cuda12.1.1-cudnn8.9.0-devel-ubuntu22.04.2.sif
+    singularity_overlay: /scratch/nhn234/singularity/aga.ext3
+##### SUGGESTED HYDRA CONFIG ###########################
+  sweep: 
+   # subdir is built dynamically using the tags
+    dir: ${oc.env:HOME}/slurm/${oc.select:hydra.launcher.date,${now:%Y-%m-%d}}/${hydra.job.name}
+  run:
+   # once we're running set tags from conf
+    dir: ${hydra.sweep.dir}/${join:${tags}}
+########################################################
