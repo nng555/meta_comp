@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, BatchSampler
 import torch.nn.functional as F
 
-class MetaDataset(Dataset):
+class OlDMetaDataset(Dataset):
 
     def __init__(self, meta_x, meta_y):
         self.x = meta_x # N x M x D

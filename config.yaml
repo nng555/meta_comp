@@ -13,7 +13,9 @@ args:
   save_dir: ~ # used by VAE generation to identify where to save generated images. #TODO: Align these scripts
   checkpoint_dir: ~ # overwrite default weight loading directory
   use_local_weights: False # If True and we have a local path for the model, local weights will be used. 
-  n_subset: ~ 
+  n_subset: ~
+  MN: ~ 
+  epoch_to_use: ~
 
 command: ~
 tags: ~

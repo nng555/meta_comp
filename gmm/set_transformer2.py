@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import math
 import numpy as np
-
 import torch.nn.functional as F
-
+import sys 
+sys.path.append("/scratch/mr7401/projects/meta_comp/")
+sys.path.append("/scratch/mr7401/projects/meta_comp/gmm/")
 from norms import get_norm
 from utils import mask_matrix, reshape_x_and_lengths, MySequential, MyLinear, interleave_batch, uninterleave_batch
 
