@@ -1,9 +1,13 @@
 # extras
+*.ckpt
+*.tar.gz
 *.pkl
 wandb/
-data/
 
 # Byte-compiled / optimized / DLL files
+**/data
+**/checkpoints
+**/generations
 checkpoints/
 kl_diffs/
 recon/
