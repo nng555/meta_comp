@@ -1,4 +1,5 @@
 # extras
+*.ckpt
 *.tar.gz
 *.pkl
 wandb/

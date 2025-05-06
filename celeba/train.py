@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader
 from model import VAE
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ConstantLR, LinearLR, SequentialLR
-import os 
-import pandas as pd 
+import os
+import pandas as pd
 
 import typer
 app = typer.Typer()
@@ -50,8 +50,8 @@ def train(
     model = VAE(
         in_channels=3,
         latent_dim=latent_dim, # maybe select them some other way?
-        device = device, 
-        
+        device = device,
+
     )
     model.to(device)
 
@@ -100,7 +100,7 @@ def train(
                     res_str += f" {k}: {l / 1000:.4f}"
                 print(res_str, flush=True)
                 batch_loss = defaultdict(float)
-        
+
         loss_averages.append(epoch_loss['loss'] / batch_per_epoch)
         recon_losses.append(epoch_loss['Reconstruction_Loss'] / batch_per_epoch)
         kld_losses.append(epoch_loss['KLD'] / batch_per_epoch)
@@ -129,7 +129,7 @@ def train(
                                 out[0].view(batch['image'].shape)[:n].cpu()])
                         save_image(comparison.cpu(),
                                 f'/scratch/mr7401/projects/meta_comp/recons_loss_checks/MN_{M_N}/ldim_{latent_dim}_e{str(epoch)}.png', nrow=n)
-                    else: 
+                    else:
                         comparison = torch.cat([batch['image'][:n],
                                 out[0].view(batch['image'].shape)[:n]])
                         save_image(comparison,
@@ -137,7 +137,7 @@ def train(
 
         test_loss /= len(test_loader.dataset)
         print('====> Test set loss: {:.4f}'.format(test_loss))
-    
+
     loss_df = pd.DataFrame({
         'epoch': range(nepochs),
         'loss_avg': loss_averages,

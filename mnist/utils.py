@@ -24,11 +24,15 @@ def gen_collate_fn(max_samples):
         x_lengths = [len(x) for x in batch_x1]
         batch_y = torch.stack([b['y'].mean() for b in batch])
 
+        #import ipdb; ipdb.set_trace()
+
         # right pad to max_samples with zeros
         batch_x1 = [F.pad(bx, (0, 0, 0, max_samples - bl), 'constant', 0) for bx, bl in zip(batch_x1, x_lengths)]
         batch_x1 = torch.stack(batch_x1)
         batch_x2 = [F.pad(bx, (0, 0, 0, max_samples - bl), 'constant', 0) for bx, bl in zip(batch_x2, x_lengths)]
         batch_x2 = torch.stack(batch_x2)
+
+        #import ipdb; ipdb.set_trace()
 
         x_lengths = torch.Tensor(x_lengths).to(device)
 
@@ -84,8 +88,6 @@ class MetaDataset(Dataset):
                         y_key = file_path.name.removesuffix('_ll.pt')
                         self.y[folder_name][y_key] = current_tensor - base_ll_tensor
 
-        import ipdb; ipdb.set_trace()
-
         # Sort folder names to ensure consistent ordering if needed
         self.folder_names.sort()
 
@@ -104,8 +106,7 @@ class MetaDataset(Dataset):
 
         y_data = self.y.get(mname1).get(mname2)[nidx] - self.y.get(mname2).get(mname1)[nidx]
 
-        import ipdb; ipdb.set_trace()
-
+        #import ipdb; ipdb.set_trace()
         return {
             'x1': x1_data,
             'x2': x2_data,

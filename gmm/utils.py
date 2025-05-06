@@ -162,3 +162,7 @@ class MySequential(nn.Sequential):
 class MyLinear(nn.Linear):
     def forward(self, x, lengths):
         return super().forward(x), lengths
+
+class MyReLU(nn.ReLU):
+    def forward(self, x, lengths):
+        return super().forward(x), lengths

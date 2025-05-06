@@ -6,7 +6,7 @@ import numpy as np
 import torch.nn.functional as F
 
 from .norms import get_norm
-from .utils import mask_matrix, reshape_x_and_lengths, MySequential, MyLinear, interleave_batch, uninterleave_batch
+from .utils import mask_matrix, reshape_x_and_lengths, MySequential, MyLinear, interleave_batch, uninterleave_batch, MyReLU
 
 
 class MAB(nn.Module):
@@ -147,7 +147,8 @@ class SetTransformer2(nn.Module):
         layers = []
 
         for i in range(n_enc_layers):
-            layers.append(ISAB(dim_hidden, dim_hidden, num_heads, num_inds, norm=norm, sample_size=sample_size))
+            #layers.append(ISAB(dim_hidden, dim_hidden, num_heads, num_inds, norm=norm, sample_size=sample_size))
+            layers.append(SAB(dim_hidden, dim_hidden, num_heads, norm=norm, sample_size=sample_size))
         if norm != "none":
             layers.append(get_norm(norm, sample_size=sample_size, dim_V=dim_hidden))
 
@@ -156,9 +157,12 @@ class SetTransformer2(nn.Module):
         self.dec = MySequential(
             SAB(dim_hidden, dim_hidden, num_heads, norm=norm, sample_size=2),
             SAB(dim_hidden, dim_hidden, num_heads, norm=norm, sample_size=2),
+            SAB(dim_hidden, dim_hidden, num_heads, norm=norm, sample_size=2),
         )
         self.mag_head = MySequential(
             PMA(dim_hidden, num_heads, 1),
+            MyLinear(dim_hidden, dim_hidden),
+            MyReLU(),
             MyLinear(dim_hidden, 1),
         )
         self.dir_head = nn.Sequential(

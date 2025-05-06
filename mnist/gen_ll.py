@@ -48,7 +48,7 @@ def gen_ll(
         save_dir = f"generations/{sample_name}"
         os.makedirs(save_dir, exist_ok=True)
 
-        torch.save(logls, f"generations/{sample_name}/{model_name}_ll.pt")
+        torch.save(logls, f"generations/{sample_name}/base_ll.pt")
 
 if __name__ == "__main__":
     app()

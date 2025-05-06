@@ -5,6 +5,7 @@ import numpy as np
 from mnist.utils import MetaDataset, gen_collate_fn, SetBatchSampler
 from gmm.set_transformer2 import *
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import ConstantLR, LinearLR, SequentialLR
 import wandb
 np.set_printoptions(suppress=True)
 
@@ -17,10 +18,19 @@ def build_loader(dataset, batch_size, collate_fn):
     loader = DataLoader(dataset, batch_sampler=bs, collate_fn=collate_fn)
     return loader
 
-def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_samples=30, loss_fn='mse_dir', temperature=1.0):
+def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-4, max_samples=30, loss_fn='mse_dir', temperature=1.0):
 
     collate_fn = gen_collate_fn(max_samples)
     optim = AdamW(model.parameters(), lr=lr)
+    scheduler = SequentialLR(
+        optim,
+        schedulers=[
+            LinearLR(optim, start_factor=1e-3, end_factor=1, total_iters=36),
+            ConstantLR(optim, factor=1, total_iters=nepochs*12),
+            LinearLR(optim, start_factor=1, end_factor=1e-3, total_iters=36),
+        ],
+        milestones=[36, nepochs*12 + 36],
+    )
 
     for epoch in tqdm(range(nepochs)):
         losses = []
@@ -35,14 +45,16 @@ def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_sam
             elif loss_fn == 'mse_dir':
                 mag_loss = torch.mean((out[0].squeeze() - torch.abs(y))**2)
                 dir_loss = F.binary_cross_entropy_with_logits(out[1].squeeze(), (y > 0).float())
-                loss = 100 * mag_loss + dir_loss
+                loss = mag_loss + dir_loss
             elif loss == "bce":
                 out = out.squeeze()
                 out /= temperature
                 y /= temperature
                 py = F.sigmoid(y)
                 loss = F.binary_cross_entropy_with_logits(out, py)
+
             losses.append(loss.item())
+
             if loss_fn == 'mse_dir':
                 wandb.log({'mse_loss': mag_loss.item(),
                            'bce_loss': dir_loss.item(),
@@ -54,6 +66,7 @@ def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_sam
                 wandb.log({loss_fn + "_loss": loss.item()})
             loss.backward()
             optim.step()
+            scheduler.step()
         if (epoch + 1) % 100 == 0:
             print(out.detach().cpu().numpy())
             print(y.cpu().numpy())
@@ -69,8 +82,8 @@ if __name__ == "__main__":
     model = SetTransformer2(
         n_inputs=784,
         n_outputs=1,
-        n_enc_layers=4,
-        dim_hidden=512,
+        n_enc_layers=6,
+        dim_hidden=1024,
         norm='set_norml',
         sample_size=max_samples,
     )
