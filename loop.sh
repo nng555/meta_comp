@@ -10,6 +10,7 @@
 #   sbatch --export=LATENT_DIM=$latent_dim simple_launch.sbatch
 # done
 
-for lr in 1e-2 1e-3 1e-4 1e-5 1e-6 1e-7 1e-8 1e-9; do 
+for lr in 1e-2 5e-2 1e-3 1e-4 1e-5 1e-6 1e-7 1e-8 1e-9; do 
   sbatch --export=LEARNING_RATE=$lr simple_launch.sbatch
 done
+
