@@ -5,9 +5,9 @@ import numpy as np
 import torch.nn.functional as F
 import sys
 sys.path.append("/scratch/mr7401/projects/meta_comp/")
-sys.path.append("/scratch/mr7401/projects/meta_comp/gmm/")
+sys.path.append("/scratch/mr7401/projects/meta_comp/models/")
 from norms import get_norm
-from utils import mask_matrix, reshape_x_and_lengths, MySequential, MyLinear, interleave_batch, uninterleave_batch
+from utils import mask_matrix, reshape_x_and_lengths, MySequential, MyLinear, MySigmoid, interleave_batch, uninterleave_batch
 
 
 class MAB(nn.Module):
@@ -131,10 +131,11 @@ class PMA(nn.Module):
         return self.mab(self.S.repeat(X.size(0), 1, 1), X, lengths=lengths, mask=["K"]), lengths
 
 # encode using the same tower then late fusion with SAB
-class SetTransformer2(nn.Module):
+class SetTransformer2New(nn.Module):
     def __init__(self, n_inputs=2, n_outputs=1, n_enc_layers=2,
                  dim_hidden=128, norm="none", sample_size=1000):
-        super(SetTransformer2, self).__init__()
+        super(SetTransformer2New, self).__init__()
+        print("SetTransformer2 from models/set_transformer2.py")
 
         num_heads = 4
         num_inds = 32

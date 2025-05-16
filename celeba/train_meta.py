@@ -8,17 +8,18 @@ from torch.optim import AdamW
 import wandb
 import sys 
 sys.path.append("/scratch/mr7401/projects/meta_comp/")
-sys.path.append("../")
-import sys 
-sys.path.append("../")
-sys.path.append("../gmm")
-from gmm.set_transformer2 import *
+# sys.path.append("../")
+# import sys 
+# sys.path.append("../")
+# sys.path.append("../gmm")
+from models.new_models_to_use import SetTransformer2New
 from logger import Logger 
 np.set_printoptions(suppress=True)
 import torch 
 import pickle 
 import pandas as pd
 import argparse
+import numpy as np
 
 
 class MetaDataset(Dataset):
@@ -117,10 +118,11 @@ def check_label_loss_compatability(label_type, loss_fn):
             raise ValueError("Using binary_diff labels with mse or mse_dir loss function is not supported. Please use bce loss function, or change the label_type to 'kldiff'")
     return 
 
-def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0, n_per_set = 5, lr=1e-3, loss_fn='mse', temperature=1.0, n_to_sample = 0, verbose = False):
+def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0, n_per_set = 5, lr=1e-3, loss_fn='mse', temperature=1.0, n_to_sample = 0, verbose = False, test= False):
     # Set training seed, devices, and logging 
     torch.manual_seed(training_seed)
     np.random.seed(training_seed)
+    torch.autograd.set_detect_anomaly(True)
 
     if torch.cuda.is_available():
         print("Using CUDA", flush=True)
@@ -132,8 +134,12 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
     os.makedirs("/scratch/mr7401/logs/test/wandb/", exist_ok=True)
     check_label_loss_compatability(label_type = label_type, loss_fn = loss_fn)
 
-    logger = Logger(logger = "wandb", log_dir = "/scratch/mr7401/logs/meta_learning_binary", 
-                    project = "vae_meta_learning_binary", 
+    if test: 
+        project_name = "test"
+    else: 
+        project_name = "vae_meta_learning_binary_testing"
+    logger = Logger(logger = "wandb", log_dir = "/scratch/mr7401/logs/meta_learning_binary_mag", 
+                    project =  project_name, 
                     logging_name = f"LR_{lr}_seed_{training_seed}_{device}", 
                     group = f"{label_type}", 
                     seed= training_seed, 
@@ -156,7 +162,8 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
         metadata_path = f"/scratch/mr7401/meta_comp_data/vaes/binary_metadatasets/MN_{MN}/{n_per_set}_10000/train_metadata.pkl"
         checkpoint_dir = f"/scratch/mr7401/meta_comp_data/vaes/binary_checkpoints/MN_{MN}/{n_per_set}_10000/{wandb.run.id}"
     
-    os.makedirs(checkpoint_dir, exist_ok=True)
+    if checkpoint_dir: 
+        os.makedirs(checkpoint_dir, exist_ok=True)
 
     print("Loading dataset from:", dataset_path, flush=True)
     print("Loading metadata from:", metadata_path, flush=True)
@@ -168,37 +175,42 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
     
     if n_to_sample > 0:
         print(f"WARNING: Sampling {n_to_sample} samples from train data", flush=True)
+        indices = np.random.permutation(len(train_data["x1"]))[:n_to_sample]
         train_data = {
-            "x1": train_data["x1"][:n_to_sample],
-            "x2": train_data["x2"][:n_to_sample],
-            "y": train_data["y"][:n_to_sample]
+            "x1": train_data["x1"][indices],
+            "x2": train_data["x2"][indices],
+            "y": train_data["y"][indices]
         }
         train_metadata = {
-            "m1_ids": train_metadata["m1_ids"][:n_to_sample],
-            "m2_ids": train_metadata["m2_ids"][:n_to_sample],
-            "m1s": train_metadata["m1s"][:n_to_sample],
-            "m2s": train_metadata["m2s"][:n_to_sample]
+            "m1_ids": [train_metadata["m1_ids"][i] for i in indices],
+            "m2_ids": [train_metadata["m2_ids"][i] for i in indices],
+            "m1s": [train_metadata["m1s"][i] for i in indices],
+            "m2s": [train_metadata["m2s"][i] for i in indices]
         }
     
     print(f"Found {len(train_data['x1'])} training samples", flush=True)
     if label_type == "kldiff":
         print(f"KLDiff Label Checks: \n- Number of Unique Label Values: {len(list(set([x.item() for x in train_data['y']])))} \n- {100*(train_data['y'] > 0).sum() / len(train_data['y']):.3f}% Greater than 0")
+        print(f"First two y values: {train_data['y'][:2]}")
     
     elif label_type == "binary_diff":
         print(f"Binary Label Checks: \n- Label Values: {list(set([x.item() for x in train_data['y']]))} \n- {100*(train_data['y'] > 0).sum() / len(train_data['y']):.3f}% Greater than 0")
-    
-    test_datasets= get_test_datasets(MN, label_type, n_per_set, seed = 2, device = device)
+        print(f"First two y values: {train_data['y'][:2]}")
+    if not test: 
+        test_datasets= get_test_datasets(MN, label_type, n_per_set, seed = 2, device = device)
+    else: 
+        test_datasets = {}
 
 
     # Build Model 
     n_features = 768
-    model = SetTransformer5(
+    model = SetTransformer2New(
         n_inputs=n_features,
         n_outputs=1,
         n_enc_layers=3,
         dim_hidden=128,
         norm='set_norml',
-        sample_size=batch_size,
+        sample_size=batch_size
     )
 
     # Move model and data to GPU if available
@@ -221,10 +233,11 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=None)
 
     test_dataloaders = {}
-    for test_name, test_dataset in test_datasets.items():
-        
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=None)
-        test_dataloaders[test_name] = test_dataloader
+    if not test:
+        for test_name, test_dataset in test_datasets.items():
+            
+            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=None)
+            test_dataloaders[test_name] = test_dataloader
 
     # Set up optimizer
     optim = AdamW(model.parameters(), lr=lr)
@@ -243,13 +256,6 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
     for epoch in tqdm(range(nepochs)):
         losses = []
         accs = []
-
-        # # Predictions 
-        # indices = []  # Initialize as a Python list
-        # mag_predictions = [] 
-        # sign_predictions = [] 
-        # labels = []
-        # set_names = []
 
         model.train()
         for i, (x1_batch, x2_batch, y, inds) in enumerate(train_dataloader):
@@ -273,6 +279,8 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
 
             if verbose:
                 print("Model output shapes: ", out[0].shape, out[1].shape, flush=True)
+                #print("Model output, index 0:", out[0], flush=True)
+                print("Model output (all): ", out, flush=True)
 
             # Compute losses
             if loss_fn == 'mse':
@@ -287,9 +295,8 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
                 dir_loss = F.binary_cross_entropy_with_logits(out[1].squeeze(), (y > 0).float())
                 loss = mag_loss + dir_loss
             elif loss_fn == "bce":
-                out_ = out[1].squeeze()
-                out_ /= temperature
-                loss = F.binary_cross_entropy_with_logits(out_, y.float())
+                out_ = out.squeeze() # use the magnitude prediction head
+                loss = F.binary_cross_entropy(out_, y.float())
             
             # Add to logging 
             losses.append(loss.item())
@@ -304,15 +311,18 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
                            'epoch': epoch + 1,
                 }) 
             elif loss_fn == 'bce':
-                acc = ((out[1].squeeze() > 0) == (y > 0)).float().mean()
+                #acc = ((torch.sigmoid(out[0].squeeze()) > 0.5) == (y > 0)).float().mean()
+                out_ = out.squeeze()
+                acc = ((out_ > 0.5) == (y > 0)).float().mean()
                 accs.append(acc.item())
                 wandb.log({
                         f'train/bce_loss': loss.item(),
-                        f'train/bce_acc': ((out[1].squeeze() > 0) == (y > 0)).float().mean(),
+                        f'train/bce_acc': acc.item(),
                         'epoch': epoch + 1,
                 })
             else:
-                wandb.log({'train/' + loss_fn + "_loss": loss.item()})
+               wandb.log({'train/' + loss_fn + "_loss": loss.item()})
+               print("")
 
             loss.backward()
             optim.step()
@@ -329,8 +339,6 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
             wandb.log({'train/avg_bce_acc': avg_train_acc})
 
 
-        
-    
         # If testing, evaluate on any test sets 
         for test_dl_name, test_dataloader in test_dataloaders.items():
 
@@ -359,45 +367,54 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
                         if verbose:
                             print("Loss shape:", loss.shape, flush=True)
                             print("Loss:", loss, flush=True)
+                        test_losses.append(loss.item())
+                    
                     elif loss_fn == 'mse_dir':
                         mag_loss = torch.mean((out[0].squeeze() - torch.abs(y))**2)
                         dir_loss = F.binary_cross_entropy_with_logits(out[1].squeeze(), (y > 0).float())
                         loss = mag_loss + dir_loss
-                    elif loss_fn == "bce":
-                        out_ = out[1].squeeze()
-                        out_ /= temperature
-                        loss = F.binary_cross_entropy_with_logits(out_, y.float())
-                    
-                    if loss_fn == 'bce' or loss_fn == 'mse_dir':
                         acc = ((out[1].squeeze() > 0) == (y > 0)).float().mean()
                         test_acc.append(acc.item())
+                        test_losses.append(loss.item())
                     
-                    test_losses.append(loss.item())
-           
+                    elif loss_fn == "bce":
+                        out_ = out.squeeze() 
+                        loss = F.binary_cross_entropy(out_, y.float())
+                        #acc = ((torch.sigmoid(out[0].squeeze()) > 0.5) == (y > 0)).float().mean()
+                        acc = ((out_ > 0.5) == (y > 0)).float().mean()
+                        if (epoch == 0 or epoch == nepochs - 1) and i < 3:
+                            print(f"\nOUTPUT TEST, {test_dl_name}, Epoch {epoch + 1} Batch {i} \nModel output: {out}\nModel output squeezed: {out_}\nLabels:{y}\nAccuracy: {((out_ > 0.5) == (y > 0)).float()}\nAcc Mean: {acc}\nLoss: {loss}", flush=True)
+                        if verbose:
+                            print("Test Loss, Batch:", loss, flush=True)
+                            print("Test Acc, Batch:", acc, flush=True)
+                        test_acc.append(acc.item())
+                        test_losses.append(loss.item())
+               
             # Keep track of losses
             avg_test_loss = np.mean(test_losses)
             epoch_test_losses[test_dl_name].append(avg_test_loss)
             print(f"Epoch {epoch + 1}/{nepochs}, {test_dl_name} Test Loss: {avg_test_loss:.4f}", flush=True)
-            wandb.log({test_dl_name + "/" + loss_fn + "_loss_avg": avg_test_loss})
+            wandb.log({"test_loss_" + loss_fn + "/" + test_dl_name: avg_test_loss})
             
             # Keep track of accuracies 
             if len(test_acc) > 0:
                 avg_test_acc = np.mean(test_acc)
                 print(f"Epoch {epoch + 1}/{nepochs}, {test_dl_name} Test Accuracy: {avg_test_acc:.4f}", flush=True)
-                wandb.log({test_dl_name + "/" + "bce_acc_avg": avg_test_acc})
+                wandb.log({ "test_acc_avg" + "/" + test_dl_name: avg_test_acc})
 
         # At the end of an epoch, save the model checkpoint
-        e = os.path.join(checkpoint_dir, "epoch_checkpoints")
-        os.makedirs(e, exist_ok=True)
-        checkpoint_path = os.path.join(e, f"epoch_{epoch + 1}.pt")
-        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+        if checkpoint_dir:
+            e = os.path.join(checkpoint_dir, "epoch_checkpoints")
+            os.makedirs(e, exist_ok=True)
+            checkpoint_path = os.path.join(e, f"epoch_{epoch + 1}.pt")
+            os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
 
-        torch.save({
-            'epoch': epoch + 1,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optim.state_dict(),
-            'loss': avg_train_loss,
-        }, checkpoint_path)
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optim.state_dict(),
+                'loss': avg_train_loss,
+            }, checkpoint_path)
     
         print(f"Checkpoint saved at {checkpoint_path}", flush=True)
 
@@ -405,13 +422,14 @@ def train(nepochs, label_type = "kldiff", batch_size=32, MN=2, training_seed = 0
     print(f"Training complete. Saving losses..", flush=True)
 
     # Save all epoch losses to CSV using pandas
-    csv_path = os.path.join(checkpoint_dir, "epoch_losses.csv")
-    loss_dict = {"epoch": range(1, len(epoch_train_losses) + 1), "train_loss": epoch_train_losses}
-    for test_name, test_losses in epoch_test_losses.items():
-        loss_dict[test_name] = test_losses
-    df = pd.DataFrame(loss_dict)
-    df.to_csv(csv_path, index=False)
-    print(f"All epoch train and test losses saved to {csv_path}", flush=True)
+    if checkpoint_dir:
+        csv_path = os.path.join(checkpoint_dir, "epoch_losses.csv")
+        loss_dict = {"epoch": range(1, len(epoch_train_losses) + 1), "train_loss": epoch_train_losses}
+        for test_name, test_losses in epoch_test_losses.items():
+            loss_dict[test_name] = test_losses
+        df = pd.DataFrame(loss_dict)
+        df.to_csv(csv_path, index=False)
+        print(f"All epoch train and test losses saved to {csv_path}", flush=True)
  
     logger.finish()
 
