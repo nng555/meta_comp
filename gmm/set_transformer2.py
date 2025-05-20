@@ -6,9 +6,8 @@ import torch.nn.functional as F
 import sys 
 sys.path.append("/scratch/mr7401/projects/meta_comp/")
 sys.path.append("/scratch/mr7401/projects/meta_comp/gmm/")
-from norms import get_norm
-from utils import mask_matrix, reshape_x_and_lengths, MySequential, MyLinear, interleave_batch, uninterleave_batch
-
+from .norms import get_norm
+from .utils import mask_matrix, reshape_x_and_lengths, MySequential, MyLinear, interleave_batch, uninterleave_batch, MyReLU
 
 class MAB(nn.Module):
     def __init__(self, dim_Q, dim_K, dim_V, num_heads,
@@ -136,24 +135,34 @@ class SetTransformer2(nn.Module):
                  dim_hidden=128, norm="none", sample_size=1000):
         super(SetTransformer2, self).__init__()
 
-        num_heads = 4
-        num_inds = 32
+        num_heads = 8
+        num_inds = 128
 
-        self.in_proj = MyLinear(n_inputs, dim_hidden)
+        self.in_proj = nn.Sequential(
+            nn.Linear(n_inputs, dim_hidden),
+            nn.LeakyReLU(0.2),
+            nn.Linear(dim_hidden, dim_hidden),
+        )
+
         layers = []
 
         for i in range(n_enc_layers):
-            layers.append(ISAB(dim_hidden, dim_hidden, num_heads, num_inds, norm=norm, sample_size=sample_size))
+            #layers.append(ISAB(dim_hidden, dim_hidden, num_heads, num_inds, norm=norm, sample_size=sample_size))
+            layers.append(SAB(dim_hidden, dim_hidden, num_heads, norm=norm, sample_size=sample_size))
         if norm != "none":
             layers.append(get_norm(norm, sample_size=sample_size, dim_V=dim_hidden))
+
         self.enc = MySequential(*layers)
         self.out_proj = PMA(dim_hidden, num_heads, 1)
         self.dec = MySequential(
             SAB(dim_hidden, dim_hidden, num_heads, norm=norm, sample_size=2),
             SAB(dim_hidden, dim_hidden, num_heads, norm=norm, sample_size=2),
+            SAB(dim_hidden, dim_hidden, num_heads, norm=norm, sample_size=2),
         )
         self.mag_head = MySequential(
             PMA(dim_hidden, num_heads, 1),
+            MyLinear(dim_hidden, dim_hidden),
+            MyReLU(),
             MyLinear(dim_hidden, 1),
         )
         self.dir_head = nn.Sequential(
@@ -167,8 +176,10 @@ class SetTransformer2(nn.Module):
         x1, x1_lengths = reshape_x_and_lengths(x1, x_lengths, device)
         x2, x2_lengths = reshape_x_and_lengths(x2, x_lengths, device)
 
-        x1, x1_lengths = self.in_proj(x1, x1_lengths)
-        x2, x2_lengths = self.in_proj(x2, x2_lengths)
+        x1 = self.in_proj(x1)
+        x2 = self.in_proj(x2)
+        #x1, x1_lengths = self.in_proj(x1, x1_lengths)
+        #x2, x2_lengths = self.in_proj(x2, x2_lengths)
         x1_out, _ = self.enc(x1, x1_lengths)
         x2_out, _ = self.enc(x2, x2_lengths)
         #x1_out, x2_out, _, _= self.enc(x1, x2, x1_lengths, x2_lengths)

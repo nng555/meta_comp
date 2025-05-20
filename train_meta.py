@@ -2,25 +2,35 @@ from torch.utils.data import DataLoader, RandomSampler
 from tqdm import tqdm
 import torch
 import numpy as np
-from utils import MetaDataset, gen_collate_fn, SetBatchSampler
-from set_transformer2 import *
+from mnist.utils import MetaDataset, gen_collate_fn, SetBatchSampler
+from gmm.set_transformer2 import *
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import ConstantLR, LinearLR, SequentialLR
 import wandb
 np.set_printoptions(suppress=True)
 
 wandb.login()
-run = wandb.init(project="neural_test_statistics")
+run = wandb.init(project="nts_mnist")
 
 def build_loader(dataset, batch_size, collate_fn):
-    base_sampler = RandomSampler(dataset)
-    batch_sampler = SetBatchSampler(batch_size, base_sampler)
-    return DataLoader(dataset, batch_sampler=batch_sampler, collate_fn=collate_fn)
+    rs = RandomSampler(dataset)
+    bs = SetBatchSampler(batch_size, rs, dataset.folder_names, min_samples=20, max_samples=30)
+    loader = DataLoader(dataset, batch_sampler=bs, collate_fn=collate_fn)
+    return loader
 
-def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_samples=30, loss_fn='mse', temperature=1.0):
+def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-4, max_samples=30, loss_fn='mse_dir', temperature=1.0):
 
-    nmodels = train_data.x.shape[1]
-    collate_fn = gen_collate_fn(nmodels, batch_size, max_samples)
+    collate_fn = gen_collate_fn(max_samples)
     optim = AdamW(model.parameters(), lr=lr)
+    scheduler = SequentialLR(
+        optim,
+        schedulers=[
+            LinearLR(optim, start_factor=1e-3, end_factor=1, total_iters=36),
+            ConstantLR(optim, factor=1, total_iters=nepochs*12),
+            LinearLR(optim, start_factor=1, end_factor=1e-3, total_iters=36),
+        ],
+        milestones=[36, nepochs*12 + 36],
+    )
 
     for epoch in tqdm(range(nepochs)):
         losses = []
@@ -42,7 +52,9 @@ def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_sam
                 y /= temperature
                 py = F.sigmoid(y)
                 loss = F.binary_cross_entropy_with_logits(out, py)
+
             losses.append(loss.item())
+
             if loss_fn == 'mse_dir':
                 wandb.log({'mse_loss': mag_loss.item(),
                            'bce_loss': dir_loss.item(),
@@ -54,6 +66,7 @@ def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_sam
                 wandb.log({loss_fn + "_loss": loss.item()})
             loss.backward()
             optim.step()
+            scheduler.step()
         if (epoch + 1) % 100 == 0:
             print(out.detach().cpu().numpy())
             print(y.cpu().numpy())
@@ -61,16 +74,16 @@ def train(model, nepochs, train_data, test_data, batch_size=32, lr=1e-3, max_sam
 
     torch.save(model, 'st5_4l.ckpt')
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     max_samples = 30
     torch.manual_seed(0)
     np.random.seed(0)
-    model = SetTransformer5(
-        n_inputs=64,
+    model = SetTransformer2(
+        n_inputs=784,
         n_outputs=1,
-        n_enc_layers=4,
-        dim_hidden=128,
+        n_enc_layers=6,
+        dim_hidden=1024,
         norm='set_norml',
         sample_size=max_samples,
     )
@@ -82,17 +95,8 @@ if __name__ == "__main__":
     else:
         device = torch.device('cpu')
 
-    train_data = np.load('data/meta_train.npy', allow_pickle=True).item()
-    test_data = np.load('data/meta_test.npy', allow_pickle=True).item()
-
-    train_data = MetaDataset(
-        torch.Tensor(train_data['x']).to(device),
-        torch.Tensor(train_data['y']).to(device),
-    )
-    test_data = MetaDataset(
-        torch.Tensor(test_data['x']).to(device),
-        torch.Tensor(test_data['y']).to(device),
-    )
+    train_data = MetaDataset('mnist/generations/train')
+    test_data = MetaDataset('mnist/generations/test')
 
     train(model, 1000, train_data, test_data, max_samples=max_samples, loss_fn='mse_dir', temperature=1)
 
