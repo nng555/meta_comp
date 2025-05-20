@@ -15,16 +15,20 @@ from PIL import Image
 import torch
 from torchvision import transforms
 
-def calculate_log_likelihood(model_name, output_file, logger, test = False, verbose = False):
+
+def calculate_log_likelihood(model_name, MN, epoch_to_use, output_file, logger, test = False, verbose = False):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    print(f"Calculate_Log_Likelihood: Using device {device}, Model = {model_name}, MN = {MN}, epoch = {epoch_to_use}", flush = True)
     
     if verbose or test:
         os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
         os.environ["TORCH_USE_CUDA_DSA"] = "1"
     
     # Load Model 
-    model1 = torch.load(f"/scratch/mr7401/projects/meta_comp/checkpoints/{model_name}_e19.pt", map_location=device)
+    checkpoint_path = f"/scratch/mr7401/projects/meta_comp/checkpoints_loss_checks/MN_{MN}/{model_name}_e{epoch_to_use}.pt"
+    model1 = torch.load(checkpoint_path, map_location=device)
     model1.device = device # this changes the device in the model class
     model1.to(device).eval() # this smoves weight 
     print(f"Calculate_Log_Likelihood: Opening output file and starting to load generation datasets...", flush = True)
@@ -34,8 +38,9 @@ def calculate_log_likelihood(model_name, output_file, logger, test = False, verb
         # of the samples under model 1. Write all into to a file with the ID. 
 
         total_complete = 0
-        
-        all_dims = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 1384] 
+        # Get all the model names to use 
+        all_dims= sorted(list(set([x.split("_")[2] for x in os.listdir(f"/scratch/mr7401/projects/meta_comp/checkpoints_loss_checks/MN_{MN}/")])))
+  
         all_model_names = [f"vae_ldim_{dim}" for dim in all_dims]
 
         for model_name2 in all_model_names: 
@@ -44,7 +49,7 @@ def calculate_log_likelihood(model_name, output_file, logger, test = False, verb
             
             try: 
                 # Load samples dataset
-                samples_path = f"/scratch/mr7401/vae_generations/{model_name2}/samples/"
+                samples_path = f"/scratch/mr7401/meta_comp_data/vaes/generations/MN_{MN}/{model_name2}/samples/"
                 if not os.path.exists(samples_path):
                     raise FileNotFoundError(f"Calculate Log Likelihood: File not found: {samples_path}. Please check the path and try again.")
                 
@@ -95,6 +100,7 @@ def calculate_log_likelihood(model_name, output_file, logger, test = False, verb
                             per_model_complete = per_model_complete + 1
                             data_entry = {
                                 "gen_source_model": model_name2,
+                                "gen_source_model_checkpoint": checkpoint_path,
                                 "generation_id": batch["id"][i],
                                 f"{model_name}_ll": batch_ll[i].item()                
                             }
@@ -126,24 +132,27 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Generate LLs using a VAE model")
     parser.add_argument('--model_name', type=str, required=True, help='Name of the model to use for generation')
-    parser.add_argument('--checkpoint_dir', type=str, required=False, default = "/scratch/mr7401/projects/meta_comp/checkpoints/", help='Directory containing model checkpoints')
-    parser.add_argument('--save_dir', type=str, required=False, default = "/scratch/mr7401/vae_generations/", help='Directory to save the generated images')
+    parser.add_argument('--MN', type=str, required=False, default = "1", help='Which MN was used for the model')
+    parser.add_argument('--epoch_to_use', type=str, required=False, help='Which epoch to use for the model')
+    parser.add_argument('--checkpoint_dir', type=str, required=False, default = "/scratch/mr7401/projects/meta_comp/checkpoints_loss_checks/", help='Directory containing model checkpoints')
+    parser.add_argument('--save_dir', type=str, required=False, default = "/scratch/mr7401/meta_comp_data/vaes/likelihoods/", help='Directory to save the generated images')
     parser.add_argument('--test', type=str2bool, required=False, default=False, help='If True, run this script in testing mode (testing loading the models and saving, without generation)')
     parser = add_log_args(parser)
 
     args, unknown_args = parser.parse_known_args()
-  
+    
     # Set up logging
     logging_name = f"{args.model_name}"
     logger = Logger(group = "Generate_VAE_LogLikelihoods", logging_name=logging_name, **vars(args))
 
     os.makedirs(f"{args.save_dir}", exist_ok=True)
-    os.makedirs(f"{args.save_dir}/{args.model_name}", exist_ok = True)
+    os.makedirs(f"{args.save_dir}/{args.MN}", exist_ok=True)
+    os.makedirs(f"{args.save_dir}/{args.MN}/{args.model_name}", exist_ok=True)
     
-    output_file = f"{args.save_dir}/{args.model_name}/log_likelihood.jsonl"
+    output_file = f"{args.save_dir}/{args.MN}/{args.model_name}/log_likelihood.jsonl"
 
     # Call function 
-    calculate_log_likelihood(model_name=args.model_name, output_file= output_file, logger=logger, verbose = False)
+    calculate_log_likelihood(model_name=args.model_name, MN=args.MN, epoch_to_use=args.epoch_to_use, output_file= output_file, logger=logger, verbose = False)
 
     print(f"Calculated Log Likelihood for All Datasets Under {args.model_name} and saved to {output_file}", flush = True)
     logger.finish()

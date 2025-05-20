@@ -163,6 +163,6 @@ class MyLinear(nn.Linear):
     def forward(self, x, lengths):
         return super().forward(x), lengths
 
-class MyReLU(nn.ReLU):
+class MySigmoid(nn.Sigmoid):
     def forward(self, x, lengths):
         return super().forward(x), lengths
